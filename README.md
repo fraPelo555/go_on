@@ -14,16 +14,8 @@ Progetto/
 ├─ .gitignore
 ├─ README.md
 
-Per creare un nuovo branch:
-- git checkout main
-- git pull origin main
-- git checkout -b nuovo_branch
-- fare add, commit e push verso nuovo_branch
-- git fetch origin
-- git checkout origin main
-- git merge origin/nuovo_branch
-- fare add, commit e il push per mettere il merge anche nel remoto
-
+Per scaricare i branch da remoto:
+git checkout -b backend origin/backend
 
 /////////////////////////
 //////// BACKEND ////////
