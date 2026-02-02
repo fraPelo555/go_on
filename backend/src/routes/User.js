@@ -21,7 +21,7 @@ router.post("/", async (req, res) => {
 });
 
 // -------- GET /users -------- 
-router.get("/", async (req, res) => {
+router.get("/", tokenChecker, requireRole("admin"), async (req, res) => {
   try {
     const users = await User.find();
     return res.status(200).json(users);
@@ -31,12 +31,20 @@ router.get("/", async (req, res) => {
 });
 
 // -------- GET /users/:id --------
-router.get("/:id", async (req, res) => {
+router.get("/:id", tokenChecker, async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
+    const { id } = req.params;
+    const requester = req.user;
+
+    if (requester.id !== id && requester.role !== "admin") {
+      return res.status(403).json({ message: "Forbidden" });
+    }
+
+    const user = await User.findById(id);
     if (!user) {
       return res.status(404).json({ message: "User not found" });
     }
+
     return res.status(200).json(user);
   } catch (error) {
     return res.status(500).json({ message: error.message });

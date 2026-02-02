@@ -10,7 +10,7 @@ const router = express.Router();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const uploadBaseDir = path.join(__dirname, "../uploads"); // cartella base uploads
+const uploadBaseDir = path.join(__dirname, "../uploads");
 if (!fs.existsSync(uploadBaseDir)) {
   fs.mkdirSync(uploadBaseDir, { recursive: true });
 }
@@ -20,7 +20,7 @@ const storage = multer.diskStorage({
   },
   filename: (req, file, cb) => {
     cb(null, file.originalname);
-  }
+  },
 });
 const upload = multer({ storage });
 
@@ -35,60 +35,65 @@ router.get("/", async (req, res) => {
       maxLength,
       minDuration,
       maxDuration,
-      tags
+      tags,
     } = req.query;
 
     const filter = {};
 
-    if(region) {
+    if (region) {
       filter.region = region;
     }
-    if(valley) {
+    if (valley) {
       filter.valley = valley;
     }
-    if(difficulty) {
+    if (difficulty) {
       filter.difficulty = difficulty;
     }
-    if(minLength) {
+    if (minLength) {
       filter.lengthKm = { ...filter.lengthKm, $gte: Number(minLength) };
     }
-    if(maxLength) {
+    if (maxLength) {
       filter.lengthKm = { ...filter.lengthKm, $lte: Number(maxLength) };
     }
 
     const exprConditions = []; // serve creare un array per avere più espressioni
-    if(minDuration) {
+    if (minDuration) {
       exprConditions.push({
-        $gte: [{ 
-          $add: [{ 
-            $multiply: ["$duration.hours", 60] 
-          }, 
-          "$duration.minutes"] 
-        },
-        Number(minDuration)
-        ]
+        $gte: [
+          {
+            $add: [
+              {
+                $multiply: ["$duration.hours", 60],
+              },
+              "$duration.minutes",
+            ],
+          },
+          Number(minDuration),
+        ],
       });
     }
-    if(maxDuration) {
+    if (maxDuration) {
       exprConditions.push({
-        $lte: [{ 
-          $add: 
-          [{ 
-            $multiply: ["$duration.hours", 60] 
-          }, 
-          "$duration.minutes"] 
-        },
-        Number(maxDuration)
-        ]
+        $lte: [
+          {
+            $add: [
+              {
+                $multiply: ["$duration.hours", 60],
+              },
+              "$duration.minutes",
+            ],
+          },
+          Number(maxDuration),
+        ],
       });
     }
-    if(tags) {
+    if (tags) {
       const tagArray = Array.isArray(tags) ? tags : tags.split(",");
-      filter.tags = { 
-        $all: tagArray 
+      filter.tags = {
+        $all: tagArray,
       };
     }
-    if(exprConditions.length > 0) {
+    if (exprConditions.length > 0) {
       filter.$expr = { $and: exprConditions };
     }
     const trails = await Trail.find(filter);
@@ -99,7 +104,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.post("/", upload.single("gpx"), async (req, res) => {
+router.post("/", tokenChecker, requireRole("admin"), upload.single("gpx"), async (req, res) => {
   let trail;
   try {
     if (req.body.duration) {
@@ -125,10 +130,12 @@ router.post("/", upload.single("gpx"), async (req, res) => {
     const ext = path.extname(req.file.originalname);
     const newPath = path.join(trailDir, `track${ext}`);
     fs.renameSync(req.file.path, newPath);
-    res.status(201).json({ trail, filePath: `/uploads/${trail.id}/track${ext}` });
+    res
+      .status(201)
+      .json({ trail, filePath: `/uploads/${trail.id}/track${ext}` });
   } catch (err) {
     console.error(err);
-    if(trail) {
+    if (trail) {
       await Trail.findByIdAndDelete(trail.id);
       const trailDir = path.join(uploadBaseDir, trail.id.toString());
       if (fs.existsSync(trailDir)) fs.rmdirSync(trailDir, { recursive: true });
@@ -141,15 +148,17 @@ router.post("/", upload.single("gpx"), async (req, res) => {
 router.get("/near", async (req, res) => {
   try {
     const { lat, lon, radius } = req.query;
-    if(!lat || !lon || !radius) {
-      return res.status(400).json({ error: "lat, lon and radius are required" });
+    if (!lat || !lon || !radius) {
+      return res
+        .status(400)
+        .json({ error: "lat, lon and radius are required" });
     }
     const trails = await Trail.find({
       location: {
         $geoWithin: {
-          $centerSphere: [[Number(lon), Number(lat)], Number(radius) / 6371] // raggio in km / raggio terrestre
-        }
-      }
+          $centerSphere: [[Number(lon), Number(lat)], Number(radius) / 6371], // raggio in km / raggio terrestre
+        },
+      },
     });
     res.json(trails);
   } catch (err) {
@@ -162,7 +171,7 @@ router.get("/near", async (req, res) => {
 router.get("/:id", async (req, res) => {
   try {
     const trail = await Trail.findById(req.params.id);
-    if(!trail) {
+    if (!trail) {
       return res.status(404).json({ error: "Trail not found" });
     }
     res.json(trail);
@@ -173,12 +182,15 @@ router.get("/:id", async (req, res) => {
 });
 
 // -------- PUT /trails/:id --------
-router.put("/:id", async (req, res) => {
+router.put("/:id", tokenChecker, requireRole("admin"), async (req, res) => {
   try {
-    const trail = await Trail.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
-    if(!trail) {
+    const trail = await Trail.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true,
+    });
+    if (!trail) {
       return res.status(404).json({ error: "Trail not found" });
-    } 
+    }
     res.json(trail);
   } catch (err) {
     console.error(err);
@@ -187,36 +199,37 @@ router.put("/:id", async (req, res) => {
 });
 
 // -------- DELETE /trails/:id --------
-router.delete("/:id", async (req, res) => {
+router.delete("/:id", tokenChecker, requireRole("admin"), async (req, res) => {
   const { id } = req.params;
   try {
-    const trail = await Trail.findById(id);
-    if (!trail) {
-      return res.status(404).json({ error: "Trail not found" });
+    if (req.loggedUser.role == "Admin") {
+      const trail = await Trail.findById(id);
+      if (!trail) {
+        return res.status(404).json({ error: "Trail not found" });
+      }
+
+      // DELETE feedback
+      await Feedback.deleteMany({ idTrail: id });
+
+      // DELETE reports
+      await Report.deleteMany({ idTrail: id });
+
+      // REMOVE trail from favourites
+      await User.updateMany({ favourites: id }, { $pull: { favourites: id } });
+
+      // DELETE trail
+      await Trail.findByIdAndDelete(id);
+
+      // DELETE files directory
+      const trailDir = path.join(uploadBaseDir, id.toString());
+      if (fs.existsSync(trailDir)) {
+        fs.rmSync(trailDir, { recursive: true, force: true });
+      }
+
+      return res.status(204).end();
+    } else {
+      return res.status(403).json({ error: "Unauthorized Access" });
     }
-
-    // DELETE feedback
-    await Feedback.deleteMany({ idTrail: id });
-
-    // DELETE reports
-    await Report.deleteMany({ idTrail: id });
-
-    // REMOVE trail from favourites
-    await User.updateMany(
-      { favourites: id },
-      { $pull: { favourites: id } }
-    );
-
-    // DELETE trail
-    await Trail.findByIdAndDelete(id);
-
-    // DELETE files directory
-    const trailDir = path.join(uploadBaseDir, id.toString());
-    if (fs.existsSync(trailDir)) {
-      fs.rmSync(trailDir, { recursive: true, force: true });
-    }
-
-    return res.status(204).end();
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });
@@ -238,7 +251,7 @@ router.get("/:id/upload/gpx", async (req, res) => {
     }
     // Cerca un file che inizia per "track"
     const files = fs.readdirSync(trailDir);
-    const gpxFile = files.find(file => file.startsWith("track"));
+    const gpxFile = files.find((file) => file.startsWith("track"));
     if (!gpxFile) {
       return res.status(404).json({ error: "GPX file not found" });
     }

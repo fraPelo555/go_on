@@ -4,11 +4,11 @@ import { Feedback } from "../models/Feedback.js";
 const router = express.Router();
 
 // -------- POST /feedbacks -------- 
-router.post("/", async (req, res) => {
+router.post("/:idTrail", tokenChecker, selfOrAdmin(), async (req, res) => {
   try {
-    const { idUser, idTrail } = req.body;
+    const idUser = req.body;
+    const idTrail = req.params.id;
 
-    // Controllo se l'utente ha già messo feedback per questa trail
     const existing = await Feedback.findOne({ idUser, idTrail });
     if (existing) {
       return res.status(409).json({ message: "Feedback already exists for this trail" });
