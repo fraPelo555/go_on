@@ -10,6 +10,10 @@ const userSchema = new mongoose.Schema({
     unique: true,
     match: /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/
   },
+  password: {
+    type: String,
+    required: true
+  },
   role: {
     type: String,
     enum: ["admin", "base"],
