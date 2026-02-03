@@ -1,5 +1,4 @@
-export const selfOrAdmin = (req, res, next) => {
-  const { id } = req.params;
+const selfOrAdmin = (id) => (req, res, next) => {
   const { user } = req;
 
   if (user?.role === "admin" || user?.id === id) {
@@ -8,3 +7,5 @@ export const selfOrAdmin = (req, res, next) => {
 
   return res.status(403).json({ message: "Forbidden" });
 };
+
+module.exports = { selfOrAdmin };

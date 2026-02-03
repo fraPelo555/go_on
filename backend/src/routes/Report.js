@@ -1,5 +1,9 @@
-import express from "express";
-import { Report } from "../models/Report.js";
+const express = require("express");
+const { Report } = require("../models/Report");
+
+const { tokenChecker } = require("../middlewares/TokenChecker");
+const { requireRole } = require("../middlewares/RequireRole");
+const { selfOrAdmin } = require("../middlewares/SelfOrAdmin");
 
 const router = express.Router();
 
@@ -78,4 +82,4 @@ router.get("/user/:idUser", async (req, res) => {
   }
 });
 
-export default router;
+module.exports = router;

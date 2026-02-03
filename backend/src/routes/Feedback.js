@@ -1,10 +1,14 @@
-import express from "express";
-import { Feedback } from "../models/Feedback.js";
+const express = require("express");
+const { Feedback } = require("../models/Feedback");
+
+const { tokenChecker } = require("../middlewares/TokenChecker");
+const { requireRole } = require("../middlewares/RequireRole");
+const { selfOrAdmin } = require("../middlewares/SelfOrAdmin");
 
 const router = express.Router();
 
 // -------- POST /feedbacks -------- 
-router.post("/:idTrail", tokenChecker, selfOrAdmin(), async (req, res) => {
+router.post("/:idTrail", tokenChecker, async (req, res) => {
   try {
     const idUser = req.body;
     const idTrail = req.params.id;
@@ -106,4 +110,4 @@ router.get("/user/:idUser", async (req, res) => {
   }
 });
 
-export default router;
+module.exports = router;

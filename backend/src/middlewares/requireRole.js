@@ -1,4 +1,4 @@
-export const requireRole = (role) => (req, res, next) => {
+const requireRole = (role) => (req, res, next) => {
   const { user } = req;
 
   if (user?.role !== role) {
@@ -10,3 +10,5 @@ export const requireRole = (role) => (req, res, next) => {
 
   return next();
 };
+
+module.exports = { requireRole };

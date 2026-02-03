@@ -1,6 +1,12 @@
-import express from "express";
-import { User } from "../models/User.js";
-import { Trail } from "../models/Trail.js"; 
+const express = require("express");
+const { User } = require("../models/User");
+const { Trail } = require("../models/Trail");
+const { Feedback } = require("../models/Feedback");
+const { Report } = require("../models/Report");
+
+const { tokenChecker } = require("../middlewares/TokenChecker");
+const { requireRole } = require("../middlewares/RequireRole");
+const { selfOrAdmin } = require("../middlewares/SelfOrAdmin");
 
 const router = express.Router();
 
@@ -149,4 +155,4 @@ router.get("/favourites/:idUser", async (req, res) => {
   }
 });
 
-export default router;
+module.exports = router;

@@ -1,19 +1,24 @@
-import express from "express";
-import { Trail } from "../models/Trail.js";
+const express = require("express");
+const { Trail } = require("../models/Trail");
+const { Feedback } = require("../models/Feedback");
+const { Report } = require("../models/Report");
+const { User } = require("../models/User");
 
-import multer from "multer";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
+const { tokenChecker } = require("../middlewares/TokenChecker");
+const { requireRole } = require("../middlewares/RequireRole");
+const { selfOrAdmin } = require("../middlewares/SelfOrAdmin");
+
+const multer = require("multer");
+const fs = require("fs");
+const path = require("path");
 
 const router = express.Router();
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 const uploadBaseDir = path.join(__dirname, "../uploads");
 if (!fs.existsSync(uploadBaseDir)) {
   fs.mkdirSync(uploadBaseDir, { recursive: true });
 }
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     cb(null, uploadBaseDir);
@@ -263,4 +268,4 @@ router.get("/:id/upload/gpx", async (req, res) => {
   }
 });
 
-export default router;
+module.exports = router;

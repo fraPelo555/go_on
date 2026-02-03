@@ -1,6 +1,6 @@
-import jwt from "jsonwebtoken";
+const jwt = require("jsonwebtoken");
 
-export const tokenChecker = (req, res, next) => {
+const tokenChecker = (req, res, next) => {
   const authHeader = req.headers.authorization;
 
   if (!authHeader) {
@@ -30,3 +30,5 @@ export const tokenChecker = (req, res, next) => {
     });
   }
 };
+
+module.exports = { tokenChecker };

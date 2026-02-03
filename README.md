@@ -53,11 +53,17 @@ Per avviare il progetto:
 2. creare file ".env" con le password
 3. npm run dev
 
+Per avviare i test:
+- npm run test
+
+
 DA FARE BACKEND:
 - ricollegare apiary e postman sul github nuovo
 - authentication Google (e anche senza)
 - mettere i permessi alle API
 - nella descrizione di Apiary il prof. descrive che il JWT può essere inserito tramite Header (x-access-token) e Query String. L'approccio moderno è utilizzare Bearer-token.
+- Cambiare l'API che quando si elimina un Utente si elimino anche i suoi Feedback e Report (si potrebbe invece inserire Utente eliminato), mentre se si elimina un Trail questo comportamento è corretto.
+
 
 API:
 - Trails

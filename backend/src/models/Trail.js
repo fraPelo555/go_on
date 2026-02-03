@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 /* 
 Attenzione: 
@@ -236,4 +236,6 @@ trailSchema.pre("save", async function (next) {
   }
 });
 
-export const Trail = mongoose.model("Trail", trailSchema);
+const Trail = mongoose.model("Trail", trailSchema);
+
+module.exports = { Trail };

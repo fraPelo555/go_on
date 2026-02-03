@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 const { Schema } = mongoose;
 
@@ -52,4 +52,6 @@ feedbackSchema.index({ valutazione: 1 });
 feedbackSchema.index({ idUser: 1, idTrail: 1 }, { unique: true });
 
 
-export const Feedback = mongoose.model("Feedback", feedbackSchema);
+const Feedback = mongoose.model("Feedback", feedbackSchema);
+
+module.exports = { Feedback };
