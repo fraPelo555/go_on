@@ -1,5 +1,13 @@
-const app = require("./app.js").default;
+const app = require("./app.js");
+const { connectToMongo } = require("./db");
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT);
+async function startServer() {
+  await connectToMongo();
+  app.listen(PORT, () => {
+    console.log(`Server avviato sulla porta ${PORT}`);
+  });
+}
+
+startServer();
