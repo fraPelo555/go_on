@@ -24,7 +24,8 @@ const userSchema = new mongoose.Schema({
       type: mongoose.Schema.Types.ObjectId,
       ref: "Trail" // riferimento al modello Trail
     }
-  ]
+  ],
+  default: []
 }, {
   timestamps: true,
   toJSON: { virtuals: true },
