@@ -1,29 +1,24 @@
 // Jest Snapshot v1, https://jestjs.io/docs/snapshot-testing
 
-exports[`GET /trails ritorna tutti i trail senza filtri 1`] = `
+exports[`GET /trails filtra per difficulty 1`] = `
 [
   {
-    "__v": 0,
-    "_id": "6982508dc7564b0065607ff6",
-    "ascentM": 0,
+    "ascentM": 600,
     "coordinates": {
       "DD": {
         "lat": 46.4,
         "lon": 11.7,
       },
     },
-    "createdAt": "2026-02-03T19:46:21.875Z",
-    "descentM": 0,
-    "description": "",
-    "difficulty": "Medium",
-    "directions": "",
+    "descentM": 600,
+    "description": "Percorso di test per verificare il modello Trail",
+    "difficulty": "Difficult",
+    "directions": "Partenza dal parcheggio principale",
     "duration": {
       "hours": 2,
       "minutes": 30,
     },
-    "highestPointM": 0,
-    "id": "6982508dc7564b0065607ff6",
-    "idAdmin": "6982508dc7564b0065607feb",
+    "highestPointM": 2100,
     "lengthKm": 10,
     "location": {
       "coordinates": [
@@ -32,21 +27,413 @@ exports[`GET /trails ritorna tutti i trail senza filtri 1`] = `
       ],
       "type": "Point",
     },
-    "lowestPointM": 0,
-    "parking": "",
+    "lowestPointM": 1500,
+    "parking": "Parcheggio gratuito presso il rifugio",
     "region": "Trentino",
-    "roadbook": "",
+    "roadbook": "Seguire il sentiero",
     "tags": [
       "scenic",
       "family_friendly",
     ],
     "title": "Trail Test",
-    "updatedAt": "2026-02-03T19:46:21.875Z",
+    "valley": "Val di Fassa",
+  },
+]
+`;
+
+exports[`GET /trails filtra per durata minima e massima (in minuti) 1`] = `
+[
+  {
+    "ascentM": 600,
+    "coordinates": {
+      "DD": {
+        "lat": 46.4,
+        "lon": 11.7,
+      },
+    },
+    "descentM": 600,
+    "description": "Percorso di test per verificare il modello Trail",
+    "difficulty": "Medium",
+    "directions": "Partenza dal parcheggio principale",
+    "duration": {
+      "hours": 3,
+      "minutes": 0,
+    },
+    "highestPointM": 2100,
+    "lengthKm": 10,
+    "location": {
+      "coordinates": [
+        11.7,
+        46.4,
+      ],
+      "type": "Point",
+    },
+    "lowestPointM": 1500,
+    "parking": "Parcheggio gratuito presso il rifugio",
+    "region": "Trentino",
+    "roadbook": "Seguire il sentiero",
+    "tags": [
+      "scenic",
+      "family_friendly",
+    ],
+    "title": "Trail Test",
+    "valley": "Val di Fassa",
+  },
+]
+`;
+
+exports[`GET /trails filtra per minLength e maxLength 1`] = `
+[
+  {
+    "ascentM": 600,
+    "coordinates": {
+      "DD": {
+        "lat": 46.4,
+        "lon": 11.7,
+      },
+    },
+    "descentM": 600,
+    "description": "Percorso di test per verificare il modello Trail",
+    "difficulty": "Medium",
+    "directions": "Partenza dal parcheggio principale",
+    "duration": {
+      "hours": 2,
+      "minutes": 30,
+    },
+    "highestPointM": 2100,
+    "lengthKm": 15,
+    "location": {
+      "coordinates": [
+        11.7,
+        46.4,
+      ],
+      "type": "Point",
+    },
+    "lowestPointM": 1500,
+    "parking": "Parcheggio gratuito presso il rifugio",
+    "region": "Trentino",
+    "roadbook": "Seguire il sentiero",
+    "tags": [
+      "scenic",
+      "family_friendly",
+    ],
+    "title": "Trail Test",
+    "valley": "Val di Fassa",
+  },
+]
+`;
+
+exports[`GET /trails filtra per region 1`] = `
+[
+  {
+    "ascentM": 600,
+    "coordinates": {
+      "DD": {
+        "lat": 46.4,
+        "lon": 11.7,
+      },
+    },
+    "descentM": 600,
+    "description": "Percorso di test per verificare il modello Trail",
+    "difficulty": "Medium",
+    "directions": "Partenza dal parcheggio principale",
+    "duration": {
+      "hours": 2,
+      "minutes": 30,
+    },
+    "highestPointM": 2100,
+    "lengthKm": 10,
+    "location": {
+      "coordinates": [
+        11.7,
+        46.4,
+      ],
+      "type": "Point",
+    },
+    "lowestPointM": 1500,
+    "parking": "Parcheggio gratuito presso il rifugio",
+    "region": "Trentino",
+    "roadbook": "Seguire il sentiero",
+    "tags": [
+      "scenic",
+      "family_friendly",
+    ],
+    "title": "Trail Test",
+    "valley": "Val di Fassa",
+  },
+]
+`;
+
+exports[`GET /trails filtra per tags (AND logico) 1`] = `
+[
+  {
+    "ascentM": 600,
+    "coordinates": {
+      "DD": {
+        "lat": 46.4,
+        "lon": 11.7,
+      },
+    },
+    "descentM": 600,
+    "description": "Percorso di test per verificare il modello Trail",
+    "difficulty": "Medium",
+    "directions": "Partenza dal parcheggio principale",
+    "duration": {
+      "hours": 2,
+      "minutes": 30,
+    },
+    "highestPointM": 2100,
+    "lengthKm": 10,
+    "location": {
+      "coordinates": [
+        11.7,
+        46.4,
+      ],
+      "type": "Point",
+    },
+    "lowestPointM": 1500,
+    "parking": "Parcheggio gratuito presso il rifugio",
+    "region": "Trentino",
+    "roadbook": "Seguire il sentiero",
+    "tags": [
+      "scenic",
+      "family_friendly",
+    ],
+    "title": "Trail Test",
+    "valley": "Val di Fassa",
+  },
+]
+`;
+
+exports[`GET /trails ritorna tutti i trail senza filtri 1`] = `
+[
+  {
+    "ascentM": 600,
+    "coordinates": {
+      "DD": {
+        "lat": 46.4,
+        "lon": 11.7,
+      },
+    },
+    "descentM": 600,
+    "description": "Percorso di test per verificare il modello Trail",
+    "difficulty": "Medium",
+    "directions": "Partenza dal parcheggio principale",
+    "duration": {
+      "hours": 2,
+      "minutes": 30,
+    },
+    "highestPointM": 2100,
+    "lengthKm": 10,
+    "location": {
+      "coordinates": [
+        11.7,
+        46.4,
+      ],
+      "type": "Point",
+    },
+    "lowestPointM": 1500,
+    "parking": "Parcheggio gratuito presso il rifugio",
+    "region": "Trentino",
+    "roadbook": "Seguire il sentiero",
+    "tags": [
+      "scenic",
+      "family_friendly",
+    ],
+    "title": "Trail Test",
     "valley": "Val di Fassa",
   },
   {
-    "__v": 0,
-    "_id": "6982508dc7564b0065607ffc",
+    "ascentM": 600,
+    "coordinates": {
+      "DD": {
+        "lat": 46.4,
+        "lon": 11.7,
+      },
+    },
+    "descentM": 600,
+    "description": "Percorso di test per verificare il modello Trail",
+    "difficulty": "Medium",
+    "directions": "Partenza dal parcheggio principale",
+    "duration": {
+      "hours": 2,
+      "minutes": 30,
+    },
+    "highestPointM": 2100,
+    "lengthKm": 10,
+    "location": {
+      "coordinates": [
+        11.7,
+        46.4,
+      ],
+      "type": "Point",
+    },
+    "lowestPointM": 1500,
+    "parking": "Parcheggio gratuito presso il rifugio",
+    "region": "Trentino",
+    "roadbook": "Seguire il sentiero",
+    "tags": [
+      "scenic",
+      "family_friendly",
+    ],
+    "title": "Altro trail",
+    "valley": "Val di Fassa",
+  },
+]
+`;
+
+exports[`GET /trails/:id should return 200 and the trail when the trail exists 1`] = `
+[
+  {
+    "ascentM": 600,
+    "coordinates": {
+      "DD": {
+        "lat": 46.4,
+        "lon": 11.7,
+      },
+    },
+    "descentM": 600,
+    "description": "Percorso di test per verificare il modello Trail",
+    "difficulty": "Medium",
+    "directions": "Partenza dal parcheggio principale",
+    "duration": {
+      "hours": 2,
+      "minutes": 30,
+    },
+    "highestPointM": 2100,
+    "lengthKm": 10,
+    "location": {
+      "coordinates": [
+        11.7,
+        46.4,
+      ],
+      "type": "Point",
+    },
+    "lowestPointM": 1500,
+    "parking": "Parcheggio gratuito presso il rifugio",
+    "region": "Trentino",
+    "roadbook": "Seguire il sentiero",
+    "tags": [
+      "scenic",
+      "family_friendly",
+    ],
+    "title": "Trail Test",
+    "valley": "Val di Fassa",
+  },
+]
+`;
+
+exports[`GET /trails/:id should return 400 if the id is not a valid ObjectId 1`] = `
+{
+  "error": "Invalid ID",
+}
+`;
+
+exports[`GET /trails/:id should return 404 if the trail does not exist 1`] = `
+{
+  "error": "Trail not found",
+}
+`;
+
+exports[`GET /trails/near handles numeric query parameters correctly 1`] = `
+[
+  {
+    "ascentM": 600,
+    "coordinates": {
+      "DD": {
+        "lat": 46.4,
+        "lon": 11.7,
+      },
+    },
+    "descentM": 600,
+    "description": "Percorso di test per verificare il modello Trail",
+    "difficulty": "Medium",
+    "directions": "Partenza dal parcheggio principale",
+    "duration": {
+      "hours": 2,
+      "minutes": 30,
+    },
+    "highestPointM": 2100,
+    "lengthKm": 10,
+    "location": {
+      "coordinates": [
+        11.7,
+        46.4,
+      ],
+      "type": "Point",
+    },
+    "lowestPointM": 1500,
+    "parking": "Parcheggio gratuito presso il rifugio",
+    "region": "Trentino",
+    "roadbook": "Seguire il sentiero",
+    "tags": [
+      "scenic",
+      "family_friendly",
+    ],
+    "title": "Trail Test",
+    "valley": "Val di Fassa",
+  },
+]
+`;
+
+exports[`GET /trails/near returns 400 if lat, lon or radius are missing 1`] = `
+{
+  "error": "lat, lon and radius are required",
+}
+`;
+
+exports[`GET /trails/near returns 500 if Trail.find throws an error 1`] = `
+{
+  "error": "Server error",
+}
+`;
+
+exports[`GET /trails/near returns empty array if no trails are within radius 1`] = `[]`;
+
+exports[`GET /trails/near returns trails within the given radius 1`] = `
+[
+  {
+    "ascentM": 600,
+    "coordinates": {
+      "DD": {
+        "lat": 46.4,
+        "lon": 11.7,
+      },
+    },
+    "descentM": 600,
+    "description": "Percorso di test per verificare il modello Trail",
+    "difficulty": "Medium",
+    "directions": "Partenza dal parcheggio principale",
+    "duration": {
+      "hours": 2,
+      "minutes": 30,
+    },
+    "highestPointM": 2100,
+    "lengthKm": 10,
+    "location": {
+      "coordinates": [
+        11.7,
+        46.4,
+      ],
+      "type": "Point",
+    },
+    "lowestPointM": 1500,
+    "parking": "Parcheggio gratuito presso il rifugio",
+    "region": "Trentino",
+    "roadbook": "Seguire il sentiero",
+    "tags": [
+      "scenic",
+      "family_friendly",
+    ],
+    "title": "Trail Vicino",
+    "valley": "Val di Fassa",
+  },
+]
+`;
+
+exports[`POST /trails crea un trail con file GPX valido 1`] = `
+[
+  {
     "ascentM": 0,
     "coordinates": {
       "DD": {
@@ -54,19 +441,16 @@ exports[`GET /trails ritorna tutti i trail senza filtri 1`] = `
         "lon": 11.7,
       },
     },
-    "createdAt": "2026-02-03T19:46:21.883Z",
     "descentM": 0,
     "description": "",
     "difficulty": "Medium",
     "directions": "",
     "duration": {
       "hours": 2,
-      "minutes": 30,
+      "minutes": 15,
     },
     "highestPointM": 0,
-    "id": "6982508dc7564b0065607ffc",
-    "idAdmin": "6982508dc7564b0065607feb",
-    "lengthKm": 10,
+    "lengthKm": 12,
     "location": {
       "coordinates": [
         11.7,
@@ -82,9 +466,27 @@ exports[`GET /trails ritorna tutti i trail senza filtri 1`] = `
       "scenic",
       "family_friendly",
     ],
-    "title": "Altro trail",
-    "updatedAt": "2026-02-03T19:46:21.883Z",
+    "title": "Trail test",
     "valley": "Val di Fassa",
   },
 ]
+`;
+
+exports[`POST /trails fallisce se coordinates non sono valide (rollback DB + FS) 1`] = `
+{
+  "error": "Trail validation failed: coordinates.DD.lat: Path \`DD.lat\` (999) is more than maximum allowed value (90).",
+}
+`;
+
+exports[`POST /trails fallisce se l'utente non è admin 1`] = `
+{
+  "message": "Forbidden",
+  "success": false,
+}
+`;
+
+exports[`POST /trails fallisce se manca il file GPX 1`] = `
+{
+  "error": "Devi caricare un file .gpx",
+}
 `;

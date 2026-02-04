@@ -54,7 +54,8 @@ Per avviare il progetto:
 3. npm run dev
 
 Per avviare i test:
-- npm run test
+- npm run test 
+- npm run test -- tests/"NomeFile".test.js
 
 
 DA FARE BACKEND:
@@ -63,6 +64,7 @@ DA FARE BACKEND:
 - mettere i permessi alle API
 - nella descrizione di Apiary il prof. descrive che il JWT può essere inserito tramite Header (x-access-token) e Query String. L'approccio moderno è utilizzare Bearer-token.
 - Cambiare l'API che quando si elimina un Utente si elimino anche i suoi Feedback e Report (si potrebbe invece inserire Utente eliminato), mentre se si elimina un Trail questo comportamento è corretto.
+- Non so il perchè ma quando si fa un post di un Trail vengono creati nella cartella uploads 2 file gpx, uno all'interno della propria cartella nominata dall'id del trail, ed uno esterno.
 
 
 API:
@@ -70,37 +72,37 @@ API:
     GET                     "/trails"       	                            Lista trail con filtri (region, valley, difficulty, tags, length, duration, ecc.)
     POST                    "/trails"	                                    Creare un nuovo trail [Autenticazione+Admin]
     GET	                    "/trails/{id}"	                                Ottenere un trail tramite ID
-    PUT                     "/trails/{id}"      	                        Aggiornare un trail [Autenticazione+Admin]
-    DELETE	                "/trails/{id}"	                                Eliminare un trail [Autenticazione+Admin]
+    PUT                     "/trails/{id}"      	                        Aggiornare un trail [Autenticazione+Admin] {DA FARE: Test}
+    DELETE	                "/trails/{id}"	                                Eliminare un trail [Autenticazione+Admin] {DA FARE: Test}
     GET	                    "/trails/near"	                                Trovare tutti i trail entro un raggio da un punto geografico scelto [Autenticazione]
-    GET	                    "/trails/{id}/upload/gpx"	                    Fare il download file GPX di un trail
+    GET	                    "/trails/{id}/upload/gpx"	                    Fare il download file GPX di un trail {DA FARE: Test}
 
 - Reports       
-    POST	                "/reports"	                                    Crea un nuovo report [Autenticazione]
-    GET	                    "/reports/all"	                                Ottiene tutti i report [Autenticazione+Admin]
-    GET	                    "/reports/{id}"	                                Ottiene un report tramite ID [Autenticazione]
-    DELETE	                "/reports/{id}"	                                Elimina un report [AutenticazioneSelf,Autenticazione+Admin]
-    GET	                    "/reports/all/trail/{idTrail}"                  Report associati a un trail [Autenticazione]
-    GET	                    "/reports/all/user/{idUser}"                    Report creati da un utente [AutenticazioneSelf,Autenticazione+Admin]
+    POST	                "/reports"	                                    Crea un nuovo report [Autenticazione] {DA FARE: Test}
+    GET	                    "/reports/all"	                                Ottiene tutti i report [Autenticazione+Admin] {DA FARE: Test}
+    GET	                    "/reports/{id}"	                                Ottiene un report tramite ID [Autenticazione] {DA FARE: Test}
+    DELETE	                "/reports/{id}"	                                Elimina un report [AutenticazioneSelf,Autenticazione+Admin] {DA FARE: Test}
+    GET	                    "/reports/all/trail/{idTrail}"                  Report associati a un trail [Autenticazione] {DA FARE: Test}
+    GET	                    "/reports/all/user/{idUser}"                    Report creati da un utente [AutenticazioneSelf,Autenticazione+Admin] {DA FARE: Test}
 
 - Feedbacks     
-    POST	                "/feedbacks/{idTrail}"                          Creare un feedback (1 per utente/trail) [AutenticazioneSelf]
-    GET	                    "/feedbacks/all"                                Ottenere la lista di tutti feedback [Autenticazione+Admin]
-    GET	                    "/feedbacks/{id}"	                            Ottenere un feedback tramite ID [Autenticazione]
-    PUT                     "/feedbacks/{id}"	                            Aggiornare un feedback [AutenticazioneSelf,Autenticazione+Admin]
-    DELETE	                "/feedbacks/{id}"	                            Eliminare un feedback [AutenticazioneSelf,Autenticazione+Admin]
-    GET 	                "/feedbacks/all/trail/{idTrail}"	            Ottenere tutti i feedback di una trail specifica [Autenticazione]
-    GET                     "/feedbacks/all/user/{idUser}"	                Ottenere tutti i feedback di un certo utente [AutenticazioneSelf,Autenticazione+Admin]
+    POST	                "/feedbacks/{idTrail}"                          Creare un feedback (1 per utente/trail) [AutenticazioneSelf] {DA FARE: Test}
+    GET	                    "/feedbacks/all"                                Ottenere la lista di tutti feedback [Autenticazione+Admin] {DA FARE: Test}
+    GET	                    "/feedbacks/{id}"	                            Ottenere un feedback tramite ID [Autenticazione] {DA FARE: Test}
+    PUT                     "/feedbacks/{id}"	                            Aggiornare un feedback [AutenticazioneSelf,Autenticazione+Admin] {DA FARE: Test}
+    DELETE	                "/feedbacks/{id}"	                            Eliminare un feedback [AutenticazioneSelf,Autenticazione+Admin] {DA FARE: Test}
+    GET 	                "/feedbacks/all/trail/{idTrail}"	            Ottenere tutti i feedback di una trail specifica [Autenticazione] {DA FARE: Test}
+    GET                     "/feedbacks/all/user/{idUser}"	                Ottenere tutti i feedback di un certo utente [AutenticazioneSelf,Autenticazione+Admin] {DA FARE: Test}
 
 - Users
-    POST	                "/users"	                                    Crea un nuovo utente e restituisce un JWT
-    GET 	                "/users/all"                                    Lista di tutti gli utenti [Autenticazione+Admin]
-    GET	                    "/users/{id}"	                                Ottenere un utente [AutenticazioneSelf,Autenticazione+Admin]
-    PUT	                    "/users/{id}"	                                Aggiornare un utente [AutenticazioneSelf,Autenticazione+Admin]
-    DELETE                  "/users/{id}"	                                Eliminare un utente [AutenticazioneSelf,Autenticazione+Admin]
-    POST                    "/users/{idUser}/favourites/{idTrail}"          Aggiungere un trail ai preferiti di un certo utente [AutenticazioneSelf,Autenticazione+Admin]
-    DELETE                  "/users/{idUser}/favourites/{idTrail}"	        Rimuovere un trail dai preferiti di un certo utente [AutenticazioneSelf,Autenticazione+Admin]
-    GET 	                "/users/favourites/{idUser}"	                Ottenere la lista dei trail preferiti di un utente [AutenticazioneSelf,Autenticazione+Admin]
+    POST	                "/users"	                                    Crea un nuovo utente e restituisce un JWT {DA FARE: Test}
+    GET 	                "/users/all"                                    Lista di tutti gli utenti [Autenticazione+Admin] {DA FARE: Test}
+    GET	                    "/users/{id}"	                                Ottenere un utente [AutenticazioneSelf,Autenticazione+Admin] {DA FARE: Test}
+    PUT	                    "/users/{id}"	                                Aggiornare un utente [AutenticazioneSelf,Autenticazione+Admin] {DA FARE: Test}
+    DELETE                  "/users/{id}"	                                Eliminare un utente [AutenticazioneSelf,Autenticazione+Admin] {DA FARE: Test}
+    POST                    "/users/{idUser}/favourites/{idTrail}"          Aggiungere un trail ai preferiti di un certo utente [AutenticazioneSelf,Autenticazione+Admin] {DA FARE: Test}
+    DELETE                  "/users/{idUser}/favourites/{idTrail}"	        Rimuovere un trail dai preferiti di un certo utente [AutenticazioneSelf,Autenticazione+Admin] {DA FARE: Test}
+    GET 	                "/users/favourites/{idUser}"	                Ottenere la lista dei trail preferiti di un utente [AutenticazioneSelf,Autenticazione+Admin] {DA FARE: Test}
 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
