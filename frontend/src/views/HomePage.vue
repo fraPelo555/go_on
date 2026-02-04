@@ -32,14 +32,9 @@ const trails = ref([
   }
 ]);
 
-/* =========================
-   LISTA VISIBILE (FILTRATA)
-========================= */
 const visibleTrails = ref([...trails.value]);
 
-/* =========================
-   RICERCA (DOM PURO)
-========================= */
+
 const handleSearch = () => {
   const input = document.getElementById("trail-search");
   if (!input) return;
