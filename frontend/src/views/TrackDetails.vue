@@ -86,14 +86,16 @@ onMounted(() => {
     <!-- HEADER -->
     <!-- HEADER -->
     <header class="header">
-      <div class="header-left"></div>
-
+      <div class="header-left">
+      </div>
+      
       <div class="header-center">
-        <img src="../assets/goon_logo.png" alt="GO-ON Logo" class="logo" /> </div>
-      <div class="header-right">
-        <router-link to="/login" class="login-btn">
-          Login
+       <img src="../assets/goon_logo.png" alt="GO-ON Logo" class="logo" /> </div>
+       <div class="header-right">
+        <router-link to="/login" class="nav-btn">
+         Login
         </router-link>
+        <router-link to="/" class="nav-btn">Home</router-link>
       </div>
     </header>
 
@@ -107,7 +109,6 @@ onMounted(() => {
         <div class="top-bar">
           <!-- HOME ICON BUTTON -->
           <!-- CLASSE: home-icon-btn -->
-          <router-link to="/" class="icon-btn home-icon-btn">🏠</router-link>
 
           <h2 class="track-title">{{ track?.name }}</h2>
 
@@ -212,6 +213,7 @@ onMounted(() => {
 .header-right {
   display: flex;
   justify-content: flex-end;
+  gap: 12px;
 }
 
 .nav-btn {
@@ -307,14 +309,6 @@ onMounted(() => {
 
 .map-container {
   flex: 1;
-}
-
-.login-btn {
-  padding: 8px 16px;
-  border-radius: 6px;
-  background-color: #2c7be5;
-  color: white;
-  text-decoration: none;
 }
 
 .actions {

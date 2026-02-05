@@ -50,15 +50,15 @@ const tags = ref([
     <!-- HEADER -->
     <header class="header">
       <div class="header-left">
-        <router-link to="/" class="nav-btn">Home</router-link>
-        <router-link to="/new-track" class="nav-btn">New Track</router-link>
+       <router-link to="/new-track" class="nav-btn">New Track</router-link>
       </div>
-
+      
       <div class="header-center">
-        <img src="../assets/goon_logo.png" class="logo" alt="GO-ON Logo" />
+       <img src="../assets/goon_logo.png" class="logo" alt="GO-ON Logo" />
       </div>
-
+      
       <div class="header-right">
+       <router-link to="/" class="nav-btn">Home</router-link>
         <router-link to="/profile" class="nav-btn">Profilo</router-link>
       </div>
     </header>

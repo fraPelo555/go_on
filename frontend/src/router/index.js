@@ -5,6 +5,7 @@ import ProfilePage from "../views/ProfilePage.vue";
 import NewTrack from "../views/NewTrack.vue";
 import StatisticsPage from "../views/StatisticsPage.vue";
 import TrackDetails from "../views/TrackDetails.vue";
+import AdminInfo from "../views/AdminInfo.vue";
 
 const routes = [
   {
@@ -36,6 +37,12 @@ const routes = [
    path: "/tracks/:id",
    name: "TrackDetails",
    component: TrackDetails,
+   props: true
+  },
+    {
+   path: "/admin",
+   name: "AdminInfo",
+   component: AdminInfo,
    props: true
   },
 ];

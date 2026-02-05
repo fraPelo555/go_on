@@ -1,36 +1,150 @@
 <script setup>
 import { ref } from "vue";
 
-/* Form data (mock) */
+/* =========================
+   FORM (backend-aligned)
+   ========================= */
 const form = ref({
-  nome: "",
-  descrizioneBreve: "",
-  descrizioneEstesa: "",
-  dislivello: "",
-  lunghezza: "",
-  durata: "",
-  difficolta: 1,
-  coordPartenza: "",
-  coordArrivo: "",
-  stagione: [],
-  gpx: "",
-  foto: "",
-  puntiInteresse: "",
-  pubblico: [],
-  attivita: [],
-  ambiente: [],
-  caratteristiche: []
+  title: "",
+  description: "",
+  region: "",
+  valley: "",
+
+  difficulty: "Easy", // Easy | Medium | Difficult
+
+  lengthKm: 0, // >= 0
+
+  duration: {
+    hours: 0,    // >= 0
+    minutes: 0  // 0 - 59
+  },
+
+  roadbook: "",
+  directions: "",
+  parking: "",
+
+  ascentM: 0,
+  descentM: 0,
+  highestPointM: 0,
+  lowestPointM: 0,
+
+  tags: [],
+
+  coordinates: {
+    Lat: "", // numero
+    Lon: ""  // numero
+  },
+
+  idAdmin: "" // TODO: auth
 });
 
-/* Utils per toggle bottoni */
+/* =========================
+   TAG GROUPS
+   ========================= */
+const tagGroups = {
+  Percorso: [
+    "linear_route",
+    "round_trip",
+    "out_and_back",
+    "multi_stage_route",
+    "summit_route",
+    "ridge"
+  ],
+  Natura: [
+    "flora",
+    "fauna",
+    "scenic",
+    "geological_highlights"
+  ],
+  Accessibilità: [
+    "family_friendly",
+    "dog_friendly",
+    "accessibility",
+    "suitable_for_strollers"
+  ],
+  Tecnico: [
+    "scrambling_required",
+    "exposed_sections",
+    "secured_passages"
+  ],
+  Servizi: [
+    "refreshment_stops_available",
+    "cableway_ascent_descent",
+    "healthy_climate"
+  ],
+  Extra: [
+    "cultural_historical_interest",
+    "insider_tip"
+  ]
+};
+
+/* =========================
+   UTILS
+   ========================= */
 const toggleValue = (list, value) => {
   const index = list.indexOf(value);
   if (index === -1) list.push(value);
   else list.splice(index, 1);
 };
 
+/* =========================
+   SAVE TRACK
+   ========================= */
 const saveTrack = () => {
-  console.log("Nuovo percorso:", form.value);
+  // Controlli minimi lato frontend
+  if (!form.value.title) {
+    alert("Il titolo è obbligatorio");
+    return;
+  }
+
+  if (form.value.duration.minutes < 0 || form.value.duration.minutes > 59) {
+    alert("I minuti devono essere tra 0 e 59");
+    return;
+  }
+
+  if (
+    form.value.coordinates.Lat === "" ||
+    form.value.coordinates.Lon === ""
+  ) {
+    alert("Inserire coordinate valide");
+    return;
+  }
+
+  /* =========================
+     PAYLOAD JSON (POST)
+     =========================
+     Backend si aspetta qualcosa di simile:
+
+  const payload = {
+    title: form.value.title,
+    description: form.value.description,
+    region: form.value.region,
+    valley: form.value.valley,
+    difficulty: form.value.difficulty,
+    lengthKm: Number(form.value.lengthKm),
+    duration: {
+      hours: Number(form.value.duration.hours),
+      minutes: Number(form.value.duration.minutes)
+    },
+    roadbook: form.value.roadbook,
+    directions: form.value.directions,
+    parking: form.value.parking,
+    ascentM: Number(form.value.ascentM),
+    descentM: Number(form.value.descentM),
+    highestPointM: Number(form.value.highestPointM),
+    lowestPointM: Number(form.value.lowestPointM),
+    tags: form.value.tags,
+    coordinates: {
+      lat: Number(form.value.coordinates.Lat),
+      lon: Number(form.value.coordinates.Lon)
+    },
+    idAdmin: form.value.idAdmin
+  };
+
+  axios.post("/trails", payload)
+  */
+
+  console.log("Payload pronto per POST:", JSON.stringify(form.value, null, 2));
 };
 </script>
 
@@ -40,7 +154,7 @@ const saveTrack = () => {
     <!-- HEADER -->
     <header class="header">
       <div class="header-left">
-        <router-link to="/profile" class="nav-btn">Profilo</router-link>
+        <router-link to="/statistics" class="nav-btn">Statistiche</router-link>
       </div>
 
       <div class="header-center">
@@ -49,7 +163,7 @@ const saveTrack = () => {
 
       <div class="header-right">
         <router-link to="/" class="nav-btn">Home</router-link>
-        <router-link to="/statistics" class="nav-btn">Statistiche</router-link>
+        <router-link to="/profile" class="nav-btn">Profilo</router-link>
       </div>
     </header>
 
@@ -58,145 +172,142 @@ const saveTrack = () => {
 
       <!-- LEFT COLUMN -->
       <section class="column">
-
         <div class="field">
-          <label>Nome</label>
-          <input v-model="form.nome" />
+          <label>Nome *</label>
+          <input v-model="form.title" />
         </div>
 
         <div class="field">
-          <label>Descrizione Breve</label>
-          <input v-model="form.descrizioneBreve" />
-        </div>
-
-        <div class="field">
-          <label>Descrizione Estesa</label>
-          <textarea v-model="form.descrizioneEstesa"></textarea>
+          <label>Descrizione breve</label>
+          <textarea v-model="form.description" />
         </div>
 
         <div class="row">
           <div class="field">
-            <label>Dislivello</label>
-            <input v-model="form.dislivello" />
+            <label>Regione</label>
+            <input v-model="form.region" />
           </div>
+
           <div class="field">
-            <label>Lunghezza</label>
-            <input v-model="form.lunghezza" />
+            <label>Valle</label>
+            <input v-model="form.valley" />
           </div>
         </div>
 
         <div class="row">
           <div class="field">
-            <label>Durata</label>
-            <input v-model="form.durata" />
+            <label>Lunghezza (km)</label>
+            <input type="number" min="0" step="0.1" v-model="form.lengthKm" />
           </div>
 
           <div class="field">
             <label>Difficoltà</label>
-            <div class="difficulty">
-              <span
-                v-for="n in 5"
-                :key="n"
-                :class="{ active: n <= form.difficolta }"
-                @click="form.difficolta = n"
-              ></span>
+            <select v-model="form.difficulty">
+              <option>Easy</option>
+              <option>Medium</option>
+              <option>Difficult</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label>Ore</label>
+            <input type="number" min="0" v-model="form.duration.hours" />
+          </div>
+
+          <div class="field">
+            <label>Minuti</label>
+            <input type="number" min="0" max="59" v-model="form.duration.minutes" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label>Roadbook</label>
+          <textarea v-model="form.roadbook" />
+        </div>
+
+        <div class="field">
+          <label>Indicazioni</label>
+          <textarea v-model="form.directions" />
+        </div>
+
+        <div class="field">
+          <label>Parcheggio</label>
+          <input v-model="form.parking" />
+        </div>
+      </section>
+
+      <!-- RIGHT COLUMN -->
+      <section class="column">
+        <div class="row">
+          <div class="field">
+            <label>Salita (m)</label>
+            <input type="number" min="0" v-model="form.ascentM" />
+          </div>
+
+          <div class="field">
+            <label>Discesa (m)</label>
+            <input type="number" min="0" v-model="form.descentM" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label>Quota max (m)</label>
+            <input type="number" v-model="form.highestPointM" />
+          </div>
+
+          <div class="field">
+            <label>Quota min (m)</label>
+            <input type="number" v-model="form.lowestPointM" />
+          </div>
+        </div>
+
+        <!-- TAGS -->
+        <div class="field">
+          <label>Tag</label>
+
+          <div
+            v-for="(tags, groupName) in tagGroups"
+            :key="groupName"
+            class="tag-group"
+          >
+            <span class="tag-title">{{ groupName }}</span>
+
+            <div class="buttons">
+              <button
+                v-for="tag in tags"
+                :key="tag"
+                type="button"
+                @click="toggleValue(form.tags, tag)"
+                :class="{ active: form.tags.includes(tag) }"
+              >
+                {{ tag.replaceAll('_', ' ') }}
+              </button>
             </div>
           </div>
         </div>
 
         <div class="field">
-          <label>Coordinate di partenza</label>
-          <input v-model="form.coordPartenza" />
-        </div>
-
-        <div class="field">
-          <label>Coordinate di arrivo</label>
-          <input v-model="form.coordArrivo" />
+          <label>Coordinate (centro mappa) *</label>
+          <input type="number" step="0.000001" placeholder="Latitudine" v-model="form.coordinates.Lat" />
+          <input type="number" step="0.000001" placeholder="Longitudine" v-model="form.coordinates.Lon" />
         </div>
 
         <button class="save-btn" @click="saveTrack">
           Salva
         </button>
-
-      </section>
-
-      <!-- RIGHT COLUMN -->
-      <section class="column">
-
-        <div class="field">
-          <label>Stagione</label>
-          <div class="buttons">
-            <button @click="toggleValue(form.stagione,'Primavera')">Primavera</button>
-            <button @click="toggleValue(form.stagione,'Estate')">Estate</button>
-            <button @click="toggleValue(form.stagione,'Autunno')">Autunno</button>
-            <button @click="toggleValue(form.stagione,'Inverno')">Inverno</button>
-          </div>
-        </div>
-
-        <div class="field">
-          <label>Traccia GPX</label>
-          <input placeholder="File GPX" />
-        </div>
-
-        <div class="field">
-          <label>Foto</label>
-          <input placeholder="Carica foto" />
-        </div>
-
-        <div class="field">
-          <label>Punti Interesse</label>
-          <input v-model="form.puntiInteresse" />
-        </div>
-
-        <div class="field">
-          <label>Pubblico</label>
-          <div class="buttons">
-            <button @click="toggleValue(form.pubblico,'Famiglia')">Famiglia</button>
-            <button @click="toggleValue(form.pubblico,'Anziani')">Anziani</button>
-            <button @click="toggleValue(form.pubblico,'Esperti')">Esperti</button>
-            <button @click="toggleValue(form.pubblico,'Principianti')">Principianti</button>
-            <button @click="toggleValue(form.pubblico,'Scuola')">Scuola</button>
-            <button @click="toggleValue(form.pubblico,'Passeggini')">Passeggini</button>
-          </div>
-        </div>
-
-        <div class="field">
-          <label>Attività</label>
-          <div class="buttons">
-            <button @click="toggleValue(form.attivita,'Trail Running')">Trail Running</button>
-            <button @click="toggleValue(form.attivita,'Trekking')">Trekking</button>
-            <button @click="toggleValue(form.attivita,'Passeggiata')">Passeggiata</button>
-            <button @click="toggleValue(form.attivita,'Mountain Bike')">Mountain Bike</button>
-          </div>
-        </div>
-
-        <div class="field">
-          <label>Ambiente</label>
-          <div class="buttons">
-            <button @click="toggleValue(form.ambiente,'Lago')">Lago</button>
-            <button @click="toggleValue(form.ambiente,'Fiume')">Fiume</button>
-            <button @click="toggleValue(form.ambiente,'Grotte')">Grotte</button>
-            <button @click="toggleValue(form.ambiente,'Cascata')">Cascata</button>
-            <button @click="toggleValue(form.ambiente,'Storico')">Storico</button>
-            <button @click="toggleValue(form.ambiente,'Panoramico')">Panoramico</button>
-          </div>
-        </div>
-
-        <div class="field">
-          <label>Caratteristiche</label>
-          <div class="buttons">
-            <button @click="toggleValue(form.caratteristiche,'Ripido')">Ripido</button>
-            <button @click="toggleValue(form.caratteristiche,'Lineare')">Lineare</button>
-            <button @click="toggleValue(form.caratteristiche,'Circolare')">Circolare</button>
-          </div>
-        </div>
-
       </section>
 
     </main>
-
   </div>
 </template>
+
+<style scoped>
+/* invariato, solo estetica */
+</style>
+
 
 <style scoped>
 .new-track-page {
@@ -205,7 +316,6 @@ const saveTrack = () => {
   flex-direction: column;
 }
 
-/* HEADER */
 .header {
   height: 80px;
   display: grid;
@@ -219,14 +329,8 @@ const saveTrack = () => {
   height: 50px;
 }
 
-
+.header-left,
 .header-right {
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-}
-
-.header-left {
   display: flex;
   gap: 12px;
 }
@@ -239,7 +343,6 @@ const saveTrack = () => {
   border-radius: 6px;
 }
 
-/* BODY */
 .form-body {
   flex: 1;
   display: flex;
@@ -259,18 +362,33 @@ const saveTrack = () => {
 }
 
 .field input,
-.field textarea {
+.field textarea,
+.field select {
   width: 100%;
   padding: 6px;
 }
 
 textarea {
-  min-height: 100px;
+  min-height: 80px;
 }
 
 .row {
   display: flex;
   gap: 12px;
+}
+
+.row > .field {
+  flex: 1;
+  min-width: 0;
+}
+
+.tag-group {
+  margin-bottom: 8px;
+}
+
+.tag-title {
+  font-weight: bold;
+  font-size: 0.9rem;
 }
 
 .buttons {
@@ -284,22 +402,13 @@ textarea {
   border: 1px solid #aaa;
   background: #f5f5f5;
   cursor: pointer;
+  border-radius: 6px;
 }
 
-.difficulty {
-  display: flex;
-  gap: 6px;
-}
-
-.difficulty span {
-  width: 20px;
-  height: 20px;
-  background: #ddd;
-  cursor: pointer;
-}
-
-.difficulty span.active {
+.buttons button.active {
   background: #2c7be5;
+  color: white;
+  border-color: #2c7be5;
 }
 
 .save-btn {

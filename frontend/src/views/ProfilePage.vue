@@ -1,49 +1,13 @@
 <script setup>
-import { ref } from "vue";
 
-/* Dati mock */
-const user = ref({
-  nome: "Mario",
-  cognome: "Rossi",
-  username: "mrossi",
-  password: "password123",
-  email: "mario.rossi@email.it",
-  cellulare: "+39 333 1234567"
-});
 
-const showPassword = ref(false);
-
-const lastSearches = ref([
-  "Sentieri Dolomiti",
-  "Percorsi lago",
-  "Trail facili",
-  "Sentieri panoramici",
-  "Percorsi MTB",
-  "Sentieri innevati",
-  "Percorsi lunghi",
-  "Trail brevi",
-  "Sentieri famiglie",
-  "Percorsi al tramonto"
-]);
-
-const reviews = ref([
-  "Recensione Sentiero delle Aquile",
-  "Recensione Anello del Bosco",
-  "Recensione Percorso del Lago"
-]);
-
-const reports = ref([
-  "Segnalazione frana",
-  "Segnalazione albero caduto",
-  "Segnalazione sentiero chiuso"
-]);
-
-/* Placeholder actions */
 const logout = () => console.log("Logout");
-const editProfile = () => console.log("Edit Profile");
-const deleteProfile = () => console.log("Delete Profile");
-const exportData = () => console.log("Export Data");
-const cookieSettings = () => console.log("Cookie Settings");
+const editProfile = () => console.log("Modifica Profilo");
+const deleteProfile = () => console.log("Elimina Profilo");
+const exportData = () => console.log("Esporta Dati");
+const manageCookies = () => console.log("Gestione Cookie");
+
+const togglePassword = () => console.log("Toggle password");
 </script>
 
 <template>
@@ -52,126 +16,107 @@ const cookieSettings = () => console.log("Cookie Settings");
     <!-- HEADER -->
     <header class="header">
       <div></div>
-
       <div class="header-center">
-        <img src="../assets/goon_logo.png" alt="GO-ON Logo" class="logo" />
+        <img src="../assets/goon_logo.png" class="logo" />
       </div>
-
       <div class="header-right">
-        <router-link to="/" class="home-btn">
-          Home
-        </router-link>
+        <router-link to="/" class="home-btn">Home</router-link>
       </div>
     </header>
 
     <!-- BODY -->
-    <main class="profile-body">
+    <main class="content">
 
-      <!-- LEFT SECTION -->
-      <aside class="left-section">
-        <div class="avatar">
-          Foto
-        </div>
+      <!-- LEFT COLUMN -->
+      <aside class="left-column">
+        <div class="avatar"></div>
 
-        <nav class="actions">
+        <div class="actions">
           <button @click="logout">Log Out</button>
           <button @click="editProfile">Modifica Profilo</button>
           <button @click="deleteProfile">Elimina Profilo</button>
           <button @click="exportData">Esporta Dati</button>
-          <button @click="cookieSettings">Cambia Gestione Cookie</button>
-        </nav>
+          <button @click="manageCookies">Cambia Gestione Cookie</button>
+        </div>
       </aside>
 
-      <!-- CENTER SECTION -->
-      <section class="center-section">
-        <table class="profile-table">
-          <tbody>
-            <tr>
-              <td>Nome</td>
-              <td><input type="text" :value="user.nome" readonly /></td>
-            </tr>
-            <tr>
-              <td>Cognome</td>
-              <td><input type="text" :value="user.cognome" readonly /></td>
-            </tr>
-            <tr>
-              <td>Username</td>
-              <td><input type="text" :value="user.username" readonly /></td>
-            </tr>
-            <tr>
-              <td>Password</td>
-              <td class="password-cell">
-                <input
-                  :type="showPassword ? 'text' : 'password'"
-                  :value="user.password"
-                  readonly
-                />
-                <button @click="showPassword = !showPassword">
-                  {{ showPassword ? "Nascondi" : "Mostra" }}
-                </button>
-              </td>
-            </tr>
-            <tr>
-              <td>E-Mail</td>
-              <td><input type="text" :value="user.email" readonly /></td>
-            </tr>
-            <tr>
-              <td>Cellulare</td>
-              <td><input type="text" :value="user.cellulare" readonly /></td>
-            </tr>
-          </tbody>
-        </table>
+      <!-- CENTER COLUMN -->
+      <section class="center-column">
+
+        <!-- USER INFO TABLE -->
+        <table class="info-table">
+  <tbody>
+    <tr>
+      <td>Username</td>
+      <td><input type="text" value="username123" /></td>
+    </tr>
+
+    <tr>
+      <td>Password</td>
+      <td class="password-cell">
+        <input type="password" value="password" />
+        <button @click="togglePassword">👁</button>
+      </td>
+    </tr>
+
+    <tr>
+      <td>E-Mail</td>
+      <td><input type="email" value="email@example.com" /></td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- LOWER SECTION -->
+<div class="history-section">
+
+  <div class="history-box">
+    <h3>Storico Recensioni</h3>
+
+           <div class="scroll-pane">
+             <div class="history-content">
+               <div class="history-entry">⭐ 4 – Sentiero Monte X</div>
+               <div class="history-entry">⭐ 5 – Lago Y</div>
+               <div class="history-entry">⭐ 3 – Cascata Z</div>
+               <div class="history-entry">⭐ 4 – Val di Fassa</div>
+               <div class="history-entry">⭐ 5 – Passo Rolle</div>
+             </div>
+           </div>
+         </div>
+
+         <div class="history-box">
+           <h3>Storico Segnalazioni</h3>
+
+          <div class="scroll-pane">
+            <div class="history-content">
+              <div class="history-entry">🚧 Sentiero interrotto</div>
+              <div class="history-entry">⚠ Frana segnalata</div>
+              <div class="history-entry">🌲 Albero caduto</div>
+              <div class="history-entry">❗ Segnaletica mancante</div>
+              <div class="history-entry">💧 Guado impraticabile</div>
+            </div>
+          </div>
+        </div>
+       
+      </div>
+
       </section>
 
-      <!-- RIGHT SECTION -->
-      <aside class="right-section">
-
-        <!-- Last searches -->
-        <div class="last-searches">
-          <div class="title">
-            Ultime 10 Ricerche
-            <span class="icon">🔍</span>
-          </div>
-
-          <ul>
-            <li v-for="(search, i) in lastSearches" :key="i">
-              {{ search }}
-            </li>
-          </ul>
-        </div>
-
-        <!-- History sections -->
-        <div class="history">
-
-          <div class="history-block">
-            <h3>Storico Recensioni</h3>
-            <ul>
-              <li v-for="(r, i) in reviews" :key="i">
-                {{ r }}
-              </li>
-            </ul>
-          </div>
-
-          <div class="history-block">
-            <h3>Storico Segnalazioni</h3>
-            <ul>
-              <li v-for="(s, i) in reports" :key="i">
-                {{ s }}
-              </li>
-            </ul>
-          </div>
-
-        </div>
-
+      <!-- RIGHT COLUMN -->
+      <aside class="right-column">
+        <h3>Ultime 10 Ricerche</h3>
+        <ul class="search-list">
+          <li>Monte Rosa</li>
+          <li>Lago Blu</li>
+          <li>Cascata Verde</li>
+          <li>Valle X</li>
+        </ul>
       </aside>
 
     </main>
-
   </div>
 </template>
 
-<style scoped>
-/* PAGE */
+<style>
 .profile-page {
   height: 100vh;
   display: flex;
@@ -181,6 +126,7 @@ const cookieSettings = () => console.log("Cookie Settings");
 /* HEADER */
 .header {
   height: 80px;
+  min-height: 80px; /* assicura altezza minima */
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
@@ -197,65 +143,65 @@ const cookieSettings = () => console.log("Cookie Settings");
   justify-content: flex-end;
 }
 
-.home-btn {
-  padding: 8px 16px;
-  background-color: #2c7be5;
-  color: white;
-  text-decoration: none;
-  border-radius: 6px;
+.nav-btn {
+  padding: 8px 14px;
 }
 
 /* BODY */
-.profile-body {
+.content {
   flex: 1;
-  display: flex;
+  display: grid;
+  grid-template-columns: 240px 1fr 240px;
+  gap: 16px;
+  padding: 16px;
 }
 
 /* LEFT */
-.left-section {
-  width: 240px;
-  padding: 16px;
-  border-right: 1px solid #ddd;
+.left-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
 }
 
 .avatar {
   width: 140px;
   height: 140px;
-  margin: 0 auto 24px;
   border-radius: 50%;
-  background-color: #eee;
+  background: #ccc;
+  margin-bottom: 16px;
+}
+
+.actions {
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .actions button {
-  display: block;
   background: none;
   border: none;
-  padding: 8px 0;
-  text-align: left;
   cursor: pointer;
+  text-align: left;
 }
 
 /* CENTER */
-.center-section {
-  flex: 1;
-  padding: 24px;
+.center-column {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
 }
 
-.profile-table {
+.info-table {
   width: 100%;
   border-collapse: collapse;
 }
 
-.profile-table td {
-  padding: 10px;
+.info-table td {
+  padding: 8px;
 }
 
-.profile-table input {
+.info-table input {
   width: 100%;
-  padding: 6px;
 }
 
 .password-cell {
@@ -263,40 +209,48 @@ const cookieSettings = () => console.log("Cookie Settings");
   gap: 8px;
 }
 
-/* RIGHT */
-.right-section {
-  width: 320px;
-  padding: 16px;
-  border-left: 1px solid #ddd;
+/* HISTORY */
+.history-section {
   display: flex;
   flex-direction: column;
+  gap: 24px;
 }
 
-.last-searches {
-  margin-bottom: 16px;
+.history-box {
+  border: 1px solid #ddd;
+  padding: 12px;
 }
 
-.title {
-  font-weight: bold;
-  display: flex;
-  justify-content: space-between;
-}
-
-.last-searches ul,
-.history-block ul {
-  margin-top: 8px;
-  padding-left: 16px;
-}
-
-.history {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.history-block {
-  flex: 1;
+.history-scroll {
+  max-height: 160px;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-entry {
+  padding: 8px;
+  background: #f2f2f2;
+  border-radius: 6px;
+}
+
+/* RIGHT */
+.right-column {
+  border-left: 1px solid #ddd;
+  padding-left: 12px;
+}
+
+.home-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  background-color: #2c7be5;
+  color: white;
+  text-decoration: none;
+}
+
+.search-list {
+  list-style: none;
+  padding: 0;
 }
 </style>
