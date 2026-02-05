@@ -12,6 +12,8 @@ const fs = require("fs");
 
 const { User } = require("../src/models/User");
 const { Trail } = require("../src/models/Trail");
+const { Feedback } = require("../src/models/Feedback.js");
+const { Report } = require("../src/models/Report.js");
 
 dotenv.config();
 
@@ -24,9 +26,11 @@ afterEach(async () => {
 });
 
 afterAll(async () => {
+  /* Per rimuovere automaticamente i file nel tests/uploads
   if (fs.existsSync(uploadDir)) {
     fs.rmSync(uploadDir, { recursive: true, force: true });
   }
+  */
   await db.closeDatabase();
 });
 
@@ -88,9 +92,6 @@ const normalize = (trails) =>
   trails.map(
     ({ _id, id, idAdmin, createdAt, updatedAt, __v, ...rest }) => rest,
   );
-
-
-
 
 
 describe("GET /trails", () => {
@@ -178,10 +179,6 @@ describe("GET /trails", () => {
   });
 });
 
-
-
-
-
 describe("POST /trails", () => {
   let token;
 
@@ -189,73 +186,324 @@ describe("POST /trails", () => {
     token = getToken(admin);
   });
 
-  it("crea un trail con file GPX valido", async () => {
+  it("crea un trail correttamente con tutti i campi", async () => {
+    const trailData = {
+      title: "Nuovo Trail",
+      description: "Percorso test",
+      region: "Trentino",
+      valley: "Val di Fassa",
+      difficulty: "Medium",
+      lengthKm: 12,
+      duration: JSON.stringify({ hours: 3, minutes: 15 }),
+      ascentM: 500,
+      descentM: 500,
+      highestPointM: 2200,
+      lowestPointM: 1500,
+      roadbook: "Segui le indicazioni",
+      directions: "Partenza dal parcheggio",
+      parking: "Parcheggio gratuito",
+      tags: JSON.stringify(["scenic", "family_friendly"]),
+      coordinates: JSON.stringify({ DD: { lat: 46.5, lon: 11.7 } }),
+      idAdmin: admin.id,
+    };
+
     const res = await request(app)
       .post("/trails")
       .set("Authorization", `Bearer ${token}`)
-      .field("title", "Trail test")
-      .field("region", "Trentino")
-      .field("valley", "Val di Fassa")
-      .field("difficulty", "Medium")
-      .field("lengthKm", 12)
-      .field("duration", JSON.stringify({ hours: 2, minutes: 15 }))
-      .field(
-        "coordinates",
-        JSON.stringify({
-          DD: { lat: 46.4, lon: 11.7 },
-        }),
-      )
-      .field("tags", JSON.stringify(["scenic", "family_friendly"]))
-      .field("idAdmin", admin.id.toString())
-      .attach("gpx", path.join(__dirname, "fixtures/test.gpx"));
+      .send(trailData);
 
     expect(res.status).toBe(201);
-    expect(res.body.trail).toBeDefined();
-    expect(res.body.trail.title).toBe("Trail test");
-    expect(res.body.trail.location).toEqual({
+    expect(res.body.title).toBe(trailData.title);
+    expect(res.body.duration.hours).toBe(3);
+    expect(res.body.duration.minutes).toBe(15);
+    expect(res.body.coordinates.DD.lat).toBe(46.5);
+    expect(res.body.coordinates.DD.lon).toBe(11.7);
+    expect(res.body.tags).toEqual(
+      expect.arrayContaining(["scenic", "family_friendly"]),
+    );
+    expect(res.body.location).toEqual({
       type: "Point",
-      coordinates: [11.7, 46.4],
+      coordinates: [11.7, 46.5],
     });
-    expect(res.body.filePath).toMatch(
-      new RegExp(`/uploads/${res.body.trail.id}/track\\.gpx`),
-    );
-
-    const trailInDb = await Trail.findById(res.body.trail.id);
-    expect(trailInDb).not.toBeNull();
-
-    const uploadDir = path.resolve(
-      process.cwd(),
-      process.env.UPLOAD_BASE_DIR,
-      res.body.trail.id,
-    );
-    expect(fs.existsSync(uploadDir)).toBe(true);
-    expect(normalize([res.body.trail])).toMatchSnapshot();
+    expect(normalize(res.body.trail)).toMatchSnapshot();
   });
 
-  it("fallisce se manca il file GPX", async () => {
+  it("ritorna 400 se manca un campo obbligatorio", async () => {
+    const trailData = {
+      description: "Percorso senza titolo",
+      idAdmin: admin.id,
+      coordinates: JSON.stringify({ DD: { lat: 46.5, lon: 11.7 } }),
+    };
+
     const res = await request(app)
       .post("/trails")
       .set("Authorization", `Bearer ${token}`)
-      .field("title", "Trail senza GPX")
-      .field(
-        "coordinates",
-        JSON.stringify({
-          DD: { lat: 46.4, lon: 11.7 },
-        }),
-      )
-      .field("idAdmin", admin.id.toString());
+      .send(trailData);
 
     expect(res.status).toBe(400);
-    expect(res.body.error).toBe("Devi caricare un file .gpx");
-
-    const trails = await Trail.find();
-    expect(trails.length).toBe(0);
     expect(res.body).toMatchSnapshot();
   });
 
-  it("fallisce se l'utente non è admin", async () => {
+  it("ritorna 400 se idAdmin non esiste", async () => {
+    const trailData = {
+      title: "Trail con admin non valido",
+      coordinates: JSON.stringify({ DD: { lat: 46.5, lon: 11.7 } }),
+      idAdmin: "000000000000000000000000",
+    };
+
+    const res = await request(app)
+      .post("/trails")
+      .set("Authorization", `Bearer ${token}`)
+      .send(trailData);
+
+    expect(res.status).toBe(400);
+    expect(res.body).toMatchSnapshot();
+  });
+
+  it("ritorna 401 se non è autenticato", async () => {
+    const trailData = {
+      title: "Trail senza token",
+      coordinates: JSON.stringify({ DD: { lat: 46.5, lon: 11.7 } }),
+      idAdmin: admin.id,
+    };
+
+    const res = await request(app).post("/trails").send(trailData);
+
+    expect(res.status).toBe(401);
+    expect(res.body).toMatchSnapshot();
+  });
+
+  it("ritorna 403 se l'utente non è admin", async () => {
     const user = await User.create({
-      username: "user",
+      username: "normalUser",
+      email: "user@test.com",
+      password: "test",
+      role: "base",
+    });
+    const userToken = getToken(user);
+
+    const trailData = {
+      title: "Trail non admin",
+      coordinates: JSON.stringify({ DD: { lat: 46.5, lon: 11.7 } }),
+      idAdmin: user.id,
+    };
+
+    const res = await request(app)
+      .post("/trails")
+      .set("Authorization", `Bearer ${userToken}`)
+      .send(trailData);
+
+    expect(res.status).toBe(403);
+    expect(res.body).toMatchSnapshot();
+  });
+});
+
+describe("PUT /trails/:id", () => {
+  let token;
+  let existingTrail;
+
+  beforeEach(async () => {
+    token = getToken(admin);
+    existingTrail = await createTrail({ title: "Trail da aggiornare" });
+  });
+
+  it("aggiorna correttamente un trail esistente", async () => {
+    const updateData = {
+      title: "Trail aggiornato",
+      lengthKm: 15,
+      duration: JSON.stringify({ hours: 4, minutes: 30 }),
+      coordinates: JSON.stringify({ DD: { lat: 46.6, lon: 11.8 } }),
+      tags: JSON.stringify(["scenic", "cultural_historical_interest"]),
+    };
+
+    const res = await request(app)
+      .put(`/trails/${existingTrail.id}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send(updateData);
+
+    expect(res.status).toBe(200);
+    expect(res.body.title).toBe(updateData.title);
+    expect(res.body.lengthKm).toBe(15);
+    expect(res.body.duration.hours).toBe(4);
+    expect(res.body.duration.minutes).toBe(30);
+    expect(res.body.coordinates.DD.lat).toBe(46.6);
+    expect(res.body.coordinates.DD.lon).toBe(11.8);
+    expect(res.body.tags).toEqual(
+      expect.arrayContaining(["scenic", "cultural_historical_interest"]),
+    );
+    expect(res.body.location).toEqual({
+      type: "Point",
+      coordinates: [11.8, 46.6],
+    });
+    expect(normalize(res.body)).toMatchSnapshot();
+  });
+
+  it("ritorna 404 se il trail non esiste", async () => {
+    const updateData = { title: "Trail inesistente" };
+
+    const res = await request(app)
+      .put(`/trails/000000000000000000000000`)
+      .set("Authorization", `Bearer ${token}`)
+      .send(updateData);
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe("Trail not found");
+    expect(res.body).toMatchSnapshot();
+  });
+
+  it("ritorna 400 se i dati sono invalidi", async () => {
+    const updateData = { lengthKm: -5 };
+
+    const res = await request(app)
+      .put(`/trails/${existingTrail.id}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send(updateData);
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/lengthKm/);
+    expect(res.body).toMatchSnapshot();
+  });
+
+  it("ritorna 401 se non è autenticato", async () => {
+    const updateData = { title: "Trail non autenticato" };
+
+    const res = await request(app)
+      .put(`/trails/${existingTrail.id}`)
+      .send(updateData);
+
+    expect(res.status).toBe(401);
+    expect(res.body).toMatchSnapshot();
+  });
+
+  it("ritorna 403 se l'utente non è admin", async () => {
+    const user = await User.create({
+      username: "normalUser",
+      email: "user2@test.com",
+      password: "test",
+      role: "base",
+    });
+    const userToken = getToken(user);
+
+    const updateData = { title: "Trail non admin" };
+
+    const res = await request(app)
+      .put(`/trails/${existingTrail.id}`)
+      .set("Authorization", `Bearer ${userToken}`)
+      .send(updateData);
+
+    expect(res.status).toBe(403);
+    expect(res.body).toMatchSnapshot();
+  });
+
+  it("normalizza i tags duplicati durante l'aggiornamento", async () => {
+    const updateData = {
+      tags: JSON.stringify(["scenic", "scenic", "family_friendly"]),
+    };
+
+    const res = await request(app)
+      .put(`/trails/${existingTrail.id}`)
+      .set("Authorization", `Bearer ${token}`)
+      .send(updateData);
+
+    expect(res.status).toBe(200);
+    expect(res.body.tags).toEqual(
+      expect.arrayContaining(["scenic", "family_friendly"]),
+    );
+    expect(res.body.tags.length).toBe(2);
+    expect(normalize(res.body)).toMatchSnapshot();
+  });
+});
+
+describe("PUT /trails/:id/gpx", () => {
+  let token;
+  let existingTrail;
+
+  const gpx1Path = path.join(__dirname, "fixtures", "test1.gpx");
+  const gpx2Path = path.join(__dirname, "fixtures", "test2.gpx");
+
+  beforeEach(async () => {
+    token = getToken(admin);
+    existingTrail = await createTrail({ title: "Trail GPX" });
+  });
+
+  it("carica correttamente un file GPX quando non è presente", async () => {
+    const res = await request(app)
+      .put(`/trails/${existingTrail.id}/gpx`)
+      .set("Authorization", `Bearer ${token}`)
+      .attach("gpx", gpx1Path);
+
+    expect(res.status).toBe(200);
+    expect(res.body.message).toBe("GPX caricato correttamente");
+    expect(res.body.filePath).toBe(`/uploads/${existingTrail.id}/track.gpx`);
+
+    const savedPath = path.join(uploadDir, existingTrail.id, "track.gpx");
+
+    expect(fs.existsSync(savedPath)).toBe(true);
+
+    const content = fs.readFileSync(savedPath, "utf8");
+    expect(content).toContain("Test Track 1");
+    expect(normalize(res.body)).toMatchSnapshot();
+  });
+
+  it("sostituisce correttamente il file GPX esistente con uno nuovo", async () => {
+    await request(app)
+      .put(`/trails/${existingTrail.id}/gpx`)
+      .set("Authorization", `Bearer ${token}`)
+      .attach("gpx", gpx1Path);
+
+    const savedPath = path.join(uploadDir, existingTrail.id, "track.gpx");
+
+    const firstContent = fs.readFileSync(savedPath, "utf8");
+
+    const res = await request(app)
+      .put(`/trails/${existingTrail.id}/gpx`)
+      .set("Authorization", `Bearer ${token}`)
+      .attach("gpx", gpx2Path);
+
+    expect(res.status).toBe(200);
+
+    const trailDir = path.join(uploadDir, existingTrail.id);
+    const files = fs.readdirSync(trailDir);
+
+    expect(files).toEqual(["track.gpx"]);
+
+    const secondContent = fs.readFileSync(savedPath, "utf8");
+
+    expect(secondContent).not.toBe(firstContent);
+    expect(secondContent).toContain("Test Track 2");
+    expect(normalize(res.body)).toMatchSnapshot();
+  });
+
+  it("ritorna 404 se il trail non esiste", async () => {
+    const res = await request(app)
+      .put(`/trails/000000000000000000000000/gpx`)
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe("Trail not found");
+    expect(res.body).toMatchSnapshot();
+  });
+
+  it("ritorna 400 se il file non è inviato", async () => {
+    const res = await request(app)
+      .put(`/trails/${existingTrail.id}/gpx`)
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBeDefined();
+    expect(res.body).toMatchSnapshot();
+  });
+
+  it("ritorna 401 se non è autenticato", async () => {
+    const res = await request(app).put(`/trails/${existingTrail.id}/gpx`);
+
+    expect(res.status).toBe(401);
+    expect(res.body).toMatchSnapshot();
+  });
+
+  it("ritorna 403 se l'utente non è admin", async () => {
+    const user = await User.create({
+      username: "normalUser",
       email: "user@test.com",
       password: "test",
       role: "base",
@@ -264,39 +512,105 @@ describe("POST /trails", () => {
     const userToken = getToken(user);
 
     const res = await request(app)
-      .post("/trails")
-      .set("Authorization", `Bearer ${userToken}`)
-      .attach("gpx", path.join(__dirname, "fixtures/test.gpx"));
+      .put(`/trails/${existingTrail.id}/gpx`)
+      .set("Authorization", `Bearer ${userToken}`);
 
     expect(res.status).toBe(403);
     expect(res.body).toMatchSnapshot();
   });
-
-  it("fallisce se coordinates non sono valide (rollback DB + FS)", async () => {
-    const res = await request(app)
-      .post("/trails")
-      .set("Authorization", `Bearer ${token}`)
-      .field("title", "Trail Coordinate Errate")
-      .field(
-        "coordinates",
-        JSON.stringify({
-          DD: { lat: 999, lon: 11.7 },
-        }),
-      )
-      .field("idAdmin", admin.id.toString())
-      .attach("gpx", path.join(__dirname, "fixtures/test.gpx"));
-
-    expect(res.status).toBe(500);
-
-    const trails = await Trail.find();
-    expect(trails.length).toBe(0);
-    expect(res.body).toMatchSnapshot();
-  });
 });
 
+describe("DELETE /trails/:id", () => {
+  let token;
+  let existingTrail;
 
+  beforeEach(async () => {
+    token = getToken(admin);
 
+    existingTrail = await createTrail({ title: "Trail da eliminare" });
 
+    const gpxPath = path.join(__dirname, "fixtures", "test1.gpx");
+    await request(app)
+      .put(`/trails/${existingTrail.id}/gpx`)
+      .set("Authorization", `Bearer ${token}`)
+      .attach("gpx", gpxPath);
+
+    await Feedback.create({
+      idTrail: existingTrail.id,
+      idUser: admin.id,
+      valutazione: 5,
+      testo: "Feedback di test",
+    });
+
+    await Report.create({
+      idTrail: existingTrail.id,
+      idUser: admin.id,
+      testo: "Report di test",
+      state: "New",
+    });
+
+    await User.findByIdAndUpdate(admin.id, {
+      $push: { favourites: existingTrail.id },
+    });
+  });
+
+  it("elimina correttamente un trail e tutti i riferimenti associati", async () => {
+    const res = await request(app)
+      .delete(`/trails/${existingTrail.id}`)
+      .set("Authorization", `Bearer ${token}`);
+    expect(res.status).toBe(204);
+  
+    const deletedTrail = await Trail.findById(existingTrail.id);
+    expect(deletedTrail).toBeNull();
+  
+    const trailDir = path.join(uploadDir, existingTrail.id);
+    expect(fs.existsSync(trailDir)).toBe(false);
+
+    const feedbacks = await Feedback.find({ idTrail: existingTrail.id });
+    expect(feedbacks.length).toBe(0);
+
+    const reports = await Report.find({ idTrail: existingTrail.id }); 
+    expect(reports.length).toBe(0);
+
+    const updatedAdmin = await User.findById(admin.id);
+    expect(updatedAdmin.favourites).not.toContain(existingTrail.id);
+    expect(res.body).toMatchSnapshot();
+  });
+
+  it("ritorna 404 se il trail non esiste", async () => {
+    const res = await request(app)
+      .delete(`/trails/000000000000000000000000`)
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe("Trail not found");
+    expect(res.body).toMatchSnapshot();
+  });
+
+  it("ritorna 401 se non è autenticato", async () => {
+    const res = await request(app).delete(`/trails/${existingTrail.id}`);
+
+    expect(res.status).toBe(401);
+    expect(res.body).toMatchSnapshot();
+  });
+
+  it("ritorna 403 se l'utente non è admin", async () => {
+    const user = await User.create({
+      username: "normalUser",
+      email: "user4@test.com",
+      password: "test",
+      role: "base",
+    });
+
+    const userToken = getToken(user);
+
+    const res = await request(app)
+      .delete(`/trails/${existingTrail.id}`)
+      .set("Authorization", `Bearer ${userToken}`);
+
+    expect(res.status).toBe(403);
+  });
+});
 
 describe("GET /trails/near", () => {
   test("returns 400 if lat, lon or radius are missing", async () => {
@@ -310,7 +624,6 @@ describe("GET /trails/near", () => {
   });
 
   test("returns trails within the given radius", async () => {
-    // Trail vicino (stesse coordinate)
     await createTrail({
       title: "Trail Vicino",
       coordinates: {
@@ -321,7 +634,6 @@ describe("GET /trails/near", () => {
       },
     });
 
-    // Trail lontano (~100km)
     await createTrail({
       title: "Trail Lontano",
       coordinates: {
@@ -337,7 +649,7 @@ describe("GET /trails/near", () => {
       .query({
         lat: 46.4,
         lon: 11.7,
-        radius: 5, // km
+        radius: 5,
       });
 
     expect(res.status).toBe(200);
@@ -361,7 +673,7 @@ describe("GET /trails/near", () => {
       .query({
         lat: 40.0,
         lon: 10.0,
-        radius: 1, // km
+        radius: 1,
       });
 
     expect(res.status).toBe(200);
@@ -404,10 +716,6 @@ describe("GET /trails/near", () => {
   });
 });
 
-
-
-
-
 describe("GET /trails/:id", () => {
   it("should return 200 and the trail when the trail exists", async () => {
     const trail = await createTrail();
@@ -429,7 +737,7 @@ describe("GET /trails/:id", () => {
   });
 
   it("should return 404 if the trail does not exist", async () => {
-    const nonExistingId = "507f1f77bcf86cd799439011"; // ObjectId valido
+    const nonExistingId = "000000000000000000000000"; 
 
     const res = await request(app).get(`/trails/${nonExistingId}`);
 
@@ -441,7 +749,7 @@ describe("GET /trails/:id", () => {
   });
 
   it("should return 400 if the id is not a valid ObjectId", async () => {
-    const invalidId = "not-a-valid-id";
+    const invalidId = "abcd";
 
     const res = await request(app).get(`/trails/${invalidId}`);
 
@@ -450,5 +758,62 @@ describe("GET /trails/:id", () => {
       error: "Invalid ID",
     });
     expect(res.body).toMatchSnapshot();
+  });
+});
+
+describe("GET /trails/:id/gpx", () => {
+  let existingTrail;
+  let token;
+  const gpxFixturePath = path.join(__dirname, "fixtures", "test1.gpx");
+
+  beforeEach(async () => {
+    token = getToken(admin);
+    existingTrail = await createTrail({ title: "Trail GPX GET" });
+
+    const res = await request(app)
+      .put(`/trails/${existingTrail.id}/gpx`)
+      .set("Authorization", `Bearer ${token}`)
+      .attach("gpx", gpxFixturePath);
+
+    expect(res.status).toBe(200);
+  });
+
+  it("scarica correttamente il file GPX", async () => {
+    const res = await request(app)
+      .get(`/trails/${existingTrail.id}/gpx`)
+      .buffer() 
+      .parse((res, callback) => {
+        let data = [];
+        res.on("data", (chunk) => data.push(chunk));
+        res.on("end", () => callback(null, Buffer.concat(data)));
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.header["content-disposition"]).toMatch(/track\.gpx/);
+    expect(res.header["content-type"]).toMatch(/gpx/);
+
+    const savedPath = path.join(uploadDir, existingTrail.id, "track.gpx");
+    const savedContent = fs.readFileSync(savedPath, "utf8");
+    const fixtureContent = fs.readFileSync(gpxFixturePath, "utf8");
+
+    expect(res.body.length).toBeGreaterThan(0);
+
+    expect(savedContent).toBe(fixtureContent);
+  });
+
+  it("ritorna 404 se il trail non esiste", async () => {
+    const res = await request(app).get(`/trails/000000000000000000000000/gpx`);
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe("Trail not found");
+  });
+
+  it("ritorna 404 se il file GPX non esiste", async () => {
+    const trailWithoutGpx = await createTrail({ title: "Trail senza GPX" });
+
+    const res = await request(app).get(`/trails/${trailWithoutGpx.id}/gpx`);
+
+    expect(res.status).toBe(404);
+    expect(res.body.error).toBe("GPX file not found");
   });
 });

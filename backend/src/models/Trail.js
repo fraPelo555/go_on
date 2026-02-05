@@ -134,7 +134,6 @@ const trailSchema = new Schema({
   lowestPointM: { 
     type: Number,
     default: 0,
-    min: 0 
   },
   tags: {
     type: [{ 
