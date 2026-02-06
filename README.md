@@ -71,11 +71,12 @@ API:
 - Trails
     GET                     "/trails"       	                            Lista trail con filtri (region, valley, difficulty, tags, length, duration, ecc.)
     POST                    "/trails"	                                    Creare un nuovo trail [Autenticazione+Admin]
+    PUT                     "/trails/{id}"      	                        Aggiornare un trail [Autenticazione+Admin] 
+    PUT                     "/trails/{id}/gpx"                              Upload/sostituzione del file gpx [Autenticazione+Admin]
+    DELETE	                "/trails/{id}"	                                Eliminare un trail [Autenticazione+Admin]
+    GET	                    "/trails/near"	                                Trovare tutti i trail entro un raggio da un punto geografico scelto
     GET	                    "/trails/{id}"	                                Ottenere un trail tramite ID
-    PUT                     "/trails/{id}"      	                        Aggiornare un trail [Autenticazione+Admin] {DA FARE: Test}
-    DELETE	                "/trails/{id}"	                                Eliminare un trail [Autenticazione+Admin] {DA FARE: Test}
-    GET	                    "/trails/near"	                                Trovare tutti i trail entro un raggio da un punto geografico scelto [Autenticazione]
-    GET	                    "/trails/{id}/upload/gpx"	                    Fare il download file GPX di un trail {DA FARE: Test}
+    GET	                    "/trails/{id}/gpx"	                            Fare il download file GPX di un trail
 
 - Reports       
     POST	                "/reports"	                                    Crea un nuovo report [Autenticazione] {DA FARE: Test}
