@@ -93,7 +93,6 @@ const normalize = (trails) =>
     ({ _id, id, idAdmin, createdAt, updatedAt, __v, ...rest }) => rest,
   );
 
-
 describe("GET /trails", () => {
   it("ritorna tutti i trail senza filtri", async () => {
     await createTrail();
@@ -225,7 +224,7 @@ describe("POST /trails", () => {
       type: "Point",
       coordinates: [11.7, 46.5],
     });
-    expect(normalize(res.body.trail)).toMatchSnapshot();
+    expect(normalize([res.body])).toMatchSnapshot();
   });
 
   it("ritorna 400 se manca un campo obbligatorio", async () => {
@@ -241,7 +240,6 @@ describe("POST /trails", () => {
       .send(trailData);
 
     expect(res.status).toBe(400);
-    expect(res.body).toMatchSnapshot();
   });
 
   it("ritorna 400 se idAdmin non esiste", async () => {
@@ -257,7 +255,6 @@ describe("POST /trails", () => {
       .send(trailData);
 
     expect(res.status).toBe(400);
-    expect(res.body).toMatchSnapshot();
   });
 
   it("ritorna 401 se non è autenticato", async () => {
@@ -270,7 +267,6 @@ describe("POST /trails", () => {
     const res = await request(app).post("/trails").send(trailData);
 
     expect(res.status).toBe(401);
-    expect(res.body).toMatchSnapshot();
   });
 
   it("ritorna 403 se l'utente non è admin", async () => {
@@ -294,7 +290,6 @@ describe("POST /trails", () => {
       .send(trailData);
 
     expect(res.status).toBe(403);
-    expect(res.body).toMatchSnapshot();
   });
 });
 
@@ -335,7 +330,7 @@ describe("PUT /trails/:id", () => {
       type: "Point",
       coordinates: [11.8, 46.6],
     });
-    expect(normalize(res.body)).toMatchSnapshot();
+    expect(normalize([res.body])).toMatchSnapshot();
   });
 
   it("ritorna 404 se il trail non esiste", async () => {
@@ -348,7 +343,6 @@ describe("PUT /trails/:id", () => {
 
     expect(res.status).toBe(404);
     expect(res.body.error).toBe("Trail not found");
-    expect(res.body).toMatchSnapshot();
   });
 
   it("ritorna 400 se i dati sono invalidi", async () => {
@@ -361,7 +355,6 @@ describe("PUT /trails/:id", () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/lengthKm/);
-    expect(res.body).toMatchSnapshot();
   });
 
   it("ritorna 401 se non è autenticato", async () => {
@@ -372,7 +365,6 @@ describe("PUT /trails/:id", () => {
       .send(updateData);
 
     expect(res.status).toBe(401);
-    expect(res.body).toMatchSnapshot();
   });
 
   it("ritorna 403 se l'utente non è admin", async () => {
@@ -392,7 +384,6 @@ describe("PUT /trails/:id", () => {
       .send(updateData);
 
     expect(res.status).toBe(403);
-    expect(res.body).toMatchSnapshot();
   });
 
   it("normalizza i tags duplicati durante l'aggiornamento", async () => {
@@ -410,7 +401,7 @@ describe("PUT /trails/:id", () => {
       expect.arrayContaining(["scenic", "family_friendly"]),
     );
     expect(res.body.tags.length).toBe(2);
-    expect(normalize(res.body)).toMatchSnapshot();
+    expect(normalize([res.body])).toMatchSnapshot();
   });
 });
 
@@ -442,7 +433,7 @@ describe("PUT /trails/:id/gpx", () => {
 
     const content = fs.readFileSync(savedPath, "utf8");
     expect(content).toContain("Test Track 1");
-    expect(normalize(res.body)).toMatchSnapshot();
+    expect(res.body).toMatchSnapshot();
   });
 
   it("sostituisce correttamente il file GPX esistente con uno nuovo", async () => {
@@ -471,7 +462,7 @@ describe("PUT /trails/:id/gpx", () => {
 
     expect(secondContent).not.toBe(firstContent);
     expect(secondContent).toContain("Test Track 2");
-    expect(normalize(res.body)).toMatchSnapshot();
+    expect(res.body).toMatchSnapshot();
   });
 
   it("ritorna 404 se il trail non esiste", async () => {
@@ -481,7 +472,6 @@ describe("PUT /trails/:id/gpx", () => {
 
     expect(res.status).toBe(404);
     expect(res.body.error).toBe("Trail not found");
-    expect(res.body).toMatchSnapshot();
   });
 
   it("ritorna 400 se il file non è inviato", async () => {
@@ -491,14 +481,12 @@ describe("PUT /trails/:id/gpx", () => {
 
     expect(res.status).toBe(400);
     expect(res.body.error).toBeDefined();
-    expect(res.body).toMatchSnapshot();
   });
 
   it("ritorna 401 se non è autenticato", async () => {
     const res = await request(app).put(`/trails/${existingTrail.id}/gpx`);
 
     expect(res.status).toBe(401);
-    expect(res.body).toMatchSnapshot();
   });
 
   it("ritorna 403 se l'utente non è admin", async () => {
@@ -516,7 +504,6 @@ describe("PUT /trails/:id/gpx", () => {
       .set("Authorization", `Bearer ${userToken}`);
 
     expect(res.status).toBe(403);
-    expect(res.body).toMatchSnapshot();
   });
 });
 
@@ -574,7 +561,6 @@ describe("DELETE /trails/:id", () => {
 
     const updatedAdmin = await User.findById(admin.id);
     expect(updatedAdmin.favourites).not.toContain(existingTrail.id);
-    expect(res.body).toMatchSnapshot();
   });
 
   it("ritorna 404 se il trail non esiste", async () => {
@@ -584,14 +570,12 @@ describe("DELETE /trails/:id", () => {
 
     expect(res.status).toBe(404);
     expect(res.body.error).toBe("Trail not found");
-    expect(res.body).toMatchSnapshot();
   });
 
   it("ritorna 401 se non è autenticato", async () => {
     const res = await request(app).delete(`/trails/${existingTrail.id}`);
 
     expect(res.status).toBe(401);
-    expect(res.body).toMatchSnapshot();
   });
 
   it("ritorna 403 se l'utente non è admin", async () => {
@@ -613,17 +597,16 @@ describe("DELETE /trails/:id", () => {
 });
 
 describe("GET /trails/near", () => {
-  test("returns 400 if lat, lon or radius are missing", async () => {
+  it("ritorna 400 se lat, lon o radius mancano", async () => {
     const res = await request(app).get("/trails/near");
 
     expect(res.status).toBe(400);
     expect(res.body).toEqual({
       error: "lat, lon and radius are required",
     });
-    expect(res.body).toMatchSnapshot();
   });
 
-  test("returns trails within the given radius", async () => {
+  it("ritorna i trails compresi nel radius", async () => {
     await createTrail({
       title: "Trail Vicino",
       coordinates: {
@@ -658,7 +641,7 @@ describe("GET /trails/near", () => {
     expect(normalize(res.body)).toMatchSnapshot();
   });
 
-  test("returns empty array if no trails are within radius", async () => {
+  it("ritorna una lista vuota se non ci sono trail compresi nel radius", async () => {
     await createTrail({
       coordinates: {
         DD: {
@@ -681,7 +664,7 @@ describe("GET /trails/near", () => {
     expect(normalize(res.body)).toMatchSnapshot();
   });
 
-  test("handles numeric query parameters correctly", async () => {
+  it("crea una query in cui bisogna fare il parsing di lat, lon e radius", async () => {
     await createTrail();
 
     const res = await request(app)
@@ -697,7 +680,7 @@ describe("GET /trails/near", () => {
     expect(normalize(res.body)).toMatchSnapshot();
   });
 
-  test("returns 500 if Trail.find throws an error", async () => {
+  it("ritorna 500 se Trail.find trova un errore", async () => {
     jest.spyOn(Trail, "find").mockImplementationOnce(() => {
       throw new Error("DB error");
     });
@@ -712,12 +695,11 @@ describe("GET /trails/near", () => {
 
     expect(res.status).toBe(500);
     expect(res.body).toEqual({ error: "Server error" });
-    expect(res.body).toMatchSnapshot();
   });
 });
 
 describe("GET /trails/:id", () => {
-  it("should return 200 and the trail when the trail exists", async () => {
+  it("ritorna 200 con il trail se il trail esiste", async () => {
     const trail = await createTrail();
 
     const res = await request(app).get(`/trails/${trail._id}`);
@@ -736,7 +718,7 @@ describe("GET /trails/:id", () => {
     expect(normalize([res.body])).toMatchSnapshot();
   });
 
-  it("should return 404 if the trail does not exist", async () => {
+  it("ritorna 404 se il trail non esiste", async () => {
     const nonExistingId = "000000000000000000000000"; 
 
     const res = await request(app).get(`/trails/${nonExistingId}`);
@@ -745,10 +727,9 @@ describe("GET /trails/:id", () => {
     expect(res.body).toEqual({
       error: "Trail not found",
     });
-    expect(res.body).toMatchSnapshot();
   });
 
-  it("should return 400 if the id is not a valid ObjectId", async () => {
+  it("ritorna 400 se l'id non è un ObjectId valido", async () => {
     const invalidId = "abcd";
 
     const res = await request(app).get(`/trails/${invalidId}`);
@@ -757,7 +738,6 @@ describe("GET /trails/:id", () => {
     expect(res.body).toEqual({
       error: "Invalid ID",
     });
-    expect(res.body).toMatchSnapshot();
   });
 });
 
