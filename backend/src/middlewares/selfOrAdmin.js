@@ -1,11 +1,19 @@
-const selfOrAdmin = (id) => (req, res, next) => {
-  const { user } = req;
+const selfOrAdmin = (getOwnerId) => async (req, res, next) => {
+  try {
+    if (req.user.role === "admin") {
+      return next();
+    }
 
-  if (user?.role === "admin" || user?.id === id) {
-    return next();
+    const ownerId = await getOwnerId(req);
+
+    if (ownerId && ownerId.toString() === req.user.id) {
+      return next();
+    }
+
+    return res.status(403).json({ message: "Forbidden" });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
   }
-
-  return res.status(403).json({ message: "Forbidden" });
 };
 
 module.exports = { selfOrAdmin };

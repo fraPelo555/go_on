@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<gpx version="1.1" creator="test">
-  <trk>
-    <name>Test Track 2</name>
-    <trkseg>
-      <trkpt lat="67.9" lon="41.9"></trkpt>
-    </trkseg>
-  </trk>
-</gpx>

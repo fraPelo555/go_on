@@ -35,3 +35,4 @@ backend/node_modules
 backend/.env
 backend/apiary.apib
 backend/tests/__snapshots__
+backend/tests/uploads
