@@ -12,7 +12,7 @@ const fs = require("fs");
 
 const { User } = require("../src/models/User");
 const { Trail } = require("../src/models/Trail");
-const { Feedback } = require("../src/models/Feedback.js");
+const { Feedback } = require("../src/models/Feedback");
 
 dotenv.config();
 

@@ -11,7 +11,7 @@ const { selfOrAdmin } = require("../middlewares/SelfOrAdmin");
 
 const router = express.Router();
 
-// -------- POST /feedbacks -------- 
+// -------- POST /feedbacks/:idTrail -------- 
 router.post("/:idTrail", tokenChecker, async (req, res) => {
   try {
     const { idUser } = req.body;
