@@ -67,7 +67,7 @@ const createUser = async ({
 };
 
 describe("POST /users - autenticazione locale", () => {
-  it("200 - autentica un utente con credenziali valide", async () => {
+  it("200 - autentica un utente esistente con password corretta", async () => {
     const password = "password123";
     const hashed = await bcrypt.hash(password, 10);
 
@@ -86,11 +86,32 @@ describe("POST /users - autenticazione locale", () => {
 
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty("token");
-    expect(res.body).toHaveProperty("email", user.email);
-    expect(res.body).toHaveProperty("username", user.username);
+    expect(res.body.email).toBe(user.email);
+    expect(res.body.username).toBe(user.username);
 
     const decoded = jwt.verify(res.body.token, process.env.JWT_SECRET);
     expect(decoded.email).toBe(user.email);
+
+    expect(normalize([res.body])).toMatchSnapshot();
+  });
+
+  it("201 - crea un nuovo utente se non esiste", async () => {
+    const res = await request(app)
+      .post("/users")
+      .send({
+        email: "nuovo@example.com",
+        password: "password123",
+        username: "nuovoutente",
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body).toHaveProperty("token");
+    expect(res.body.email).toBe("nuovo@example.com");
+    expect(res.body.username).toBe("nuovoutente");
+
+    const userInDb = await User.findOne({ email: "nuovo@example.com" });
+    expect(userInDb).not.toBeNull();
+    expect(userInDb.username).toBe("nuovoutente");
 
     expect(normalize([res.body])).toMatchSnapshot();
   });
@@ -115,18 +136,6 @@ describe("POST /users - autenticazione locale", () => {
     expect(res.body.success).toBe(false);
   });
 
-  it("401 - rifiuta autenticazione se l'utente non esiste", async () => {
-    const res = await request(app)
-      .post("/users")
-      .send({
-        email: "inesistente@example.com",
-        password: "password123",
-      });
-
-    expect(res.status).toBe(401);
-    expect(res.body.message).toMatch(/User not found/i);
-  });
-
   it("400 - rifiuta richiesta senza email e password", async () => {
     const res = await request(app)
       .post("/users")
@@ -138,7 +147,7 @@ describe("POST /users - autenticazione locale", () => {
 });
 
 describe("POST /users - autenticazione Google", () => {
-  it("200 - crea un nuovo utente al primo login Google", async () => {
+  it("201 - crea un nuovo utente al primo login Google", async () => {
     OAuth2Client.mockImplementation(() => ({
       verifyIdToken: jest.fn().mockResolvedValue({
         getPayload: () => ({
@@ -151,13 +160,13 @@ describe("POST /users - autenticazione Google", () => {
     const res = await request(app)
       .post("/users")
       .send({
-        googleToken: "google-token-valido",
+        googleToken: "token-valido",
       });
 
-    expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty("email", "googleuser@example.com");
-    expect(res.body).toHaveProperty("username", "Google User");
+    expect(res.status).toBe(201);
     expect(res.body).toHaveProperty("token");
+    expect(res.body.email).toBe("googleuser@example.com");
+    expect(res.body.username).toBe("Google User");
 
     const userInDb = await User.findOne({ email: "googleuser@example.com" });
     expect(userInDb).not.toBeNull();
@@ -184,12 +193,13 @@ describe("POST /users - autenticazione Google", () => {
     const res = await request(app)
       .post("/users")
       .send({
-        googleToken: "google-token-valido",
+        googleToken: "token-valido",
       });
 
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty("token");
     expect(res.body.email).toBe("googleuser@example.com");
+    expect(res.body.username).toBe("Google User");
   });
 
   it("500 - fallisce autenticazione con Google token non valido", async () => {
@@ -200,7 +210,7 @@ describe("POST /users - autenticazione Google", () => {
     const res = await request(app)
       .post("/users")
       .send({
-        googleToken: "google-token-non-valido",
+        googleToken: "token-non-valido",
       });
 
     expect(res.status).toBe(500);
