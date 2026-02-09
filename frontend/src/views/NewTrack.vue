@@ -232,14 +232,15 @@ const saveTrack = () => {
           <textarea v-model="form.directions" />
         </div>
 
-        <div class="field">
-          <label>Parcheggio</label>
-          <input v-model="form.parking" />
-        </div>
+
       </section>
 
       <!-- RIGHT COLUMN -->
       <section class="column">
+        <div class="field">
+          <label>Parcheggio</label>
+          <input v-model="form.parking" />
+        </div>
         <div class="row">
           <div class="field">
             <label>Salita (m)</label>
@@ -266,8 +267,6 @@ const saveTrack = () => {
 
         <!-- TAGS -->
         <div class="field">
-          <label>Tag</label>
-
           <div
             v-for="(tags, groupName) in tagGroups"
             :key="groupName"
@@ -416,6 +415,7 @@ textarea {
   width: 120px;
   padding: 10px;
   background: #2c7be5;
+  align-self: flex-end;
   color: white;
   border: none;
   cursor: pointer;

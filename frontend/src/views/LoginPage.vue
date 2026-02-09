@@ -1,17 +1,65 @@
 <script setup>
 import { ref } from "vue";
+import { useRouter } from "vue-router";
+import api from "../api/axios";
+
+const router = useRouter();
 
 const username = ref("");
 const password = ref("");
+const error = ref("");
 
 const handleLogin = () => {
-  console.log("Login:", username.value, password.value);
+
+  // MOCK AUTH
+  localStorage.setItem("token", "FAKE_JWT_TOKEN");
+  localStorage.setItem("userId", username.value || "mockUser123");
+
+  // cambia true / false per testare
+  localStorage.setItem("isAdmin", username.value === "admin");
+
+  // redirect
+  router.push("/");
 };
 
-const handleGoogleSignup = () => {
-  console.log("Google Sign Up");
-};
+
+// da scommentare per fare il login serio, sopra è un mock
+// const handleLogin = async () => {
+//   error.value = "";
+
+//   try {
+//     // 👉 CHIAMATA BACKEND
+//     const res = await api.post("/auth/login", {
+//       username: username.value,
+//       password: password.value
+//     });
+
+//     /*
+//       Backend risponde tipo:
+//       {
+//         token: "...",
+//         userId: "...",
+//         isAdmin: true
+//       }
+//     */
+
+//     const { token, userId, isAdmin } = res.data;
+
+//     // 👉 SALVATAGGIO STATO
+//     localStorage.setItem("token", token);
+//     localStorage.setItem("userId", userId);
+//     localStorage.setItem("isAdmin", isAdmin);
+
+//     // 👉 VAI ALLA HOME
+//     router.push("/");
+
+//   } catch (err) {
+//     error.value = "Credenziali non valide";
+//   }
+// };
 </script>
+
+
 
 <template>
   <div class="login-page">
@@ -44,6 +92,9 @@ const handleGoogleSignup = () => {
         <h1>Login</h1>
       </section>
 
+      <!-- DIVIDER -->
+      <div class="divider"></div>
+
       <!-- CENTER FORM -->
       <section class="center-section">
 
@@ -74,13 +125,12 @@ const handleGoogleSignup = () => {
           <button class="login-btn" @click="handleLogin">
             Login
           </button>
+          <p v-if="error" style="color:red">{{ error }}</p>
 
         </div>
 
       </section>
 
-      <!-- DIVIDER -->
-      <div class="divider"></div>
 
       <!-- RIGHT SECTION -->
       <section class="right-section">

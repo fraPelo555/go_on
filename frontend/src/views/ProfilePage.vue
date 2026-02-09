@@ -1,14 +1,116 @@
 <script setup>
+import { ref, onMounted } from "vue";
+import { useRouter } from "vue-router";
+import {
+  getUserById,
+  updateUser,
+  deleteUser
+} from "../services/userService";
 
+/* ROUTER */
+const router = useRouter();
 
-const logout = () => console.log("Logout");
-const editProfile = () => console.log("Modifica Profilo");
-const deleteProfile = () => console.log("Elimina Profilo");
-const exportData = () => console.log("Esporta Dati");
-const manageCookies = () => console.log("Gestione Cookie");
+/* AUTH */
+const userId = localStorage.getItem("userId");
+if (!userId) router.push("/login");
 
-const togglePassword = () => console.log("Toggle password");
+/* STATE */
+const user = ref(null);
+const editMode = ref(false);
+
+const form = ref({
+  username: "",
+  email: "",
+  newPassword: "",
+  currentPassword: "",
+  avatar: null
+});
+
+const showPassword = ref(false);
+
+/* ======================
+   FETCH USER
+   ====================== */
+const fetchUser = async () => {
+  try {
+    const res = await getUserById(userId);
+    user.value = res.data;
+
+    form.value.username = user.value.username;
+    form.value.email = user.value.email;
+  } catch (err) {
+    console.error("Errore fetch user", err);
+  }
+};
+
+onMounted(fetchUser);
+
+/* ======================
+   LOGOUT
+   ====================== */
+const logout = () => {
+  localStorage.clear();
+  router.push("/login");
+};
+
+/* ======================
+   EDIT PROFILE
+   ====================== */
+const editProfile = () => {
+  editMode.value = !editMode.value;
+};
+
+/* ======================
+   SAVE PROFILE
+   ====================== */
+const saveProfile = async () => {
+  try {
+    if (form.value.newPassword && !form.value.currentPassword) {
+      alert("Inserisci la password attuale");
+      return;
+    }
+
+    const payload = {
+      username: form.value.username,
+      email: form.value.email,
+    };
+
+    if (form.value.newPassword) {
+      payload.password = form.value.newPassword;
+      payload.currentPassword = form.value.currentPassword;
+    }
+
+    await updateUser(userId, payload);
+    editMode.value = false;
+    fetchUser();
+  } catch (err) {
+    alert("Errore aggiornamento profilo");
+  }
+};
+
+/* ======================
+   DELETE PROFILE
+   ====================== */
+const deleteProfileConfirm = async () => {
+  if (!confirm("Sei sicuro di voler eliminare il profilo?")) return;
+
+  try {
+    await deleteUser(userId);
+    localStorage.clear();
+    router.push("/login");
+  } catch (err) {
+    alert("Errore eliminazione profilo");
+  }
+};
+
+/* ======================
+   PASSWORD TOGGLE
+   ====================== */
+const togglePassword = () => {
+  showPassword.value = !showPassword.value;
+};
 </script>
+
 
 <template>
   <div class="profile-page">
@@ -29,12 +131,17 @@ const togglePassword = () => console.log("Toggle password");
 
       <!-- LEFT COLUMN -->
       <aside class="left-column">
-        <div class="avatar"></div>
+        <div class="avatar">
+          <!-- Futuro upload avatar -->
+        </div>
 
         <div class="actions">
           <button @click="logout">Log Out</button>
-          <button @click="editProfile">Modifica Profilo</button>
-          <button @click="deleteProfile">Elimina Profilo</button>
+          <button @click="editProfile">
+            {{ editMode ? "Annulla" : "Modifica Profilo" }}
+          </button>
+          <button v-if="editMode" @click="saveProfile">Salva Modifiche</button>
+          <button @click="deleteProfileConfirm" class="danger">Elimina Profilo</button>
           <button @click="exportData">Esporta Dati</button>
           <button @click="manageCookies">Cambia Gestione Cookie</button>
         </div>
@@ -45,59 +152,83 @@ const togglePassword = () => console.log("Toggle password");
 
         <!-- USER INFO TABLE -->
         <table class="info-table">
-  <tbody>
-    <tr>
-      <td>Username</td>
-      <td><input type="text" value="username123" /></td>
-    </tr>
+          <tbody>
+            <tr>
+              <td>Username</td>
+              <td>
+                <input type="text" v-model="form.username" :disabled="!editMode" />
+              </td>
+            </tr>
 
-    <tr>
-      <td>Password</td>
-      <td class="password-cell">
-        <input type="password" value="password" />
-        <button @click="togglePassword">👁</button>
-      </td>
-    </tr>
+            <tr>
+              <td>Email</td>
+              <td>
+                <input type="email" v-model="form.email" :disabled="!editMode" />
+              </td>
+            </tr>
 
-    <tr>
-      <td>E-Mail</td>
-      <td><input type="email" value="email@example.com" /></td>
-    </tr>
-  </tbody>
-</table>
+            <tr>
+              <td>Password</td>
+              <td class="password-cell">
+                <input
+                  :type="showPassword ? 'text' : 'password'"
+                  v-model="form.currentPassword"
+                  :disabled="!editMode"
+                  placeholder="Password attuale"
+                />
+                <input
+                  :type="showPassword ? 'text' : 'password'"
+                  v-model="form.newPassword"
+                  :disabled="!editMode"
+                  placeholder="Nuova password"
+                />
+                <button @click="togglePassword">👁</button>
+              </td>
+            </tr>
 
-<!-- LOWER SECTION -->
-<div class="history-section">
+            <tr>
+              <td>Avatar</td>
+              <td>
+                <input type="file" :disabled="!editMode" @change="e => form.avatar = e.target.files[0]" />
+              </td>
+            </tr>
+          </tbody>
+        </table>
 
-  <div class="history-box">
-    <h3>Storico Recensioni</h3>
+        <!-- LOWER SECTION: HISTORY -->
+        <div class="history-section">
 
-           <div class="scroll-pane">
-             <div class="history-content">
-               <div class="history-entry">⭐ 4 – Sentiero Monte X</div>
-               <div class="history-entry">⭐ 5 – Lago Y</div>
-               <div class="history-entry">⭐ 3 – Cascata Z</div>
-               <div class="history-entry">⭐ 4 – Val di Fassa</div>
-               <div class="history-entry">⭐ 5 – Passo Rolle</div>
-             </div>
-           </div>
-         </div>
-
-         <div class="history-box">
-           <h3>Storico Segnalazioni</h3>
-
-          <div class="scroll-pane">
-            <div class="history-content">
-              <div class="history-entry">🚧 Sentiero interrotto</div>
-              <div class="history-entry">⚠ Frana segnalata</div>
-              <div class="history-entry">🌲 Albero caduto</div>
-              <div class="history-entry">❗ Segnaletica mancante</div>
-              <div class="history-entry">💧 Guado impraticabile</div>
+          <div class="history-box">
+            <h3>Storico Recensioni</h3>
+            <div class="scroll-pane">
+              <div class="history-content">
+                <div
+                  v-for="(entry, idx) in user?.feedbacks || []"
+                  :key="idx"
+                  class="history-entry"
+                >
+                  {{ entry }}
+                </div>
+              </div>
             </div>
           </div>
+
+          <div class="history-box">
+            <h3>Storico Segnalazioni</h3>
+            <div class="scroll-pane">
+              <div class="history-content">
+                <div
+                  v-for="(entry, idx) in user?.reports || []"
+                  :key="idx"
+                  class="history-entry"
+                >
+                  {{ entry }}
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
-       
-      </div>
 
       </section>
 
@@ -105,16 +236,14 @@ const togglePassword = () => console.log("Toggle password");
       <aside class="right-column">
         <h3>Ultime 10 Ricerche</h3>
         <ul class="search-list">
-          <li>Monte Rosa</li>
-          <li>Lago Blu</li>
-          <li>Cascata Verde</li>
-          <li>Valle X</li>
+          <li v-for="(search, idx) in user?.recentSearches || []" :key="idx">{{ search }}</li>
         </ul>
       </aside>
 
     </main>
   </div>
 </template>
+
 
 <style>
 .profile-page {

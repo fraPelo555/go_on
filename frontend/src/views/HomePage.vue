@@ -1,30 +1,51 @@
 <script setup>
-import { ref, watch, onMounted } from "vue";
-import { useRoute, useRouter } from "vue-router";
-import TrailMap from "../components/TrailMap.vue";
-import { getTrails } from "../services/trailService";
+  import { ref, watch, onMounted } from "vue";
+  import { useRoute, useRouter } from "vue-router";
+  import TrailMap from "../components/TrailMap.vue";
+  import { getTrails } from "../services/trailService";
 
-/* ROUTER */
-const route = useRoute();
-const router = useRouter();
+  /* ROUTER */
+  const route = useRoute();
+  const router = useRouter();
 
-/* STATE */
-const trails = ref([]);
-const visibleTrails = ref([]);
-const showAdvanced = ref(false);
-const selectedTags = ref([]);
+  /* STATE */
+  const trails = ref([]);
+  const visibleTrails = ref([]);
+  const showAdvanced = ref(false);
+  const selectedTags = ref([]);
 
-/* TAG DINAMICI */
-const tagGroups = ref({});
+  /* AUTH STATE */
+  const isLogged = ref(false);
+  const userId = ref(null);
+  const isAdmin = ref(false);
 
-/* =========================
-   FETCH TAGS (DERIVATI)
-   ========================= */
-const fetchTags = (trailList) => {
-  const allTags = new Set();
+  const checkAuth = () => {
+    const token = localStorage.getItem("token");
+  
+    if (token) {
+      isLogged.value = true;
+      userId.value = localStorage.getItem("userId");
+      isAdmin.value = localStorage.getItem("isAdmin") === "true";
+    } else {
+      isLogged.value = false;
+      userId.value = null;
+      isAdmin.value = false;
+    }
+  };
 
-  trailList.forEach(trail => {
-    (trail.tags || []).forEach(tag => allTags.add(tag));
+  onMounted(() => {
+    checkAuth();
+  });
+
+  /* TAG DINAMICI */
+  const tagGroups = ref({});
+
+  /* FETCH TAGS (DERIVATI) */
+  const fetchTags = (trailList) => {
+    const allTags = new Set();
+  
+    trailList.forEach(trail => {
+      (trail.tags || []).forEach(tag => allTags.add(tag));
   });
 
   const tags = Array.from(allTags);
@@ -48,75 +69,73 @@ const fetchTags = (trailList) => {
     Extra: tags.filter(t =>
       ["cultural_historical_interest", "insider_tip"].includes(t)
     )
+   };
   };
-};
 
-/* =========================
-   FETCH TRAILS
-   ========================= */
-const fetchTrails = async () => {
-  try {
-    const response = await getTrails(route.query);
+  /* FETCH TRAILS */
+  const fetchTrails = async () => {
+    try {
+      const response = await getTrails(route.query);
 
-    trails.value = response.data.map(trail => ({
-      id: trail._id,
-      title: trail.title,
-      description: trail.description || "Nessuna descrizione",
-      region: trail.region,
-      valley: trail.valley,
-      difficulty: trail.difficulty,
-      lengthKm: trail.lengthKm,
-      lengthLabel: `${trail.lengthKm} km`,
-      duration: trail.duration,
-      durationLabel: `${trail.duration.hours}h ${trail.duration.minutes}m`,
-      ascentM: trail.ascentM,
-      descentM: trail.descentM,
-      highestPointM: trail.highestPointM,
-      lowestPointM: trail.lowestPointM,
-      roadbook: trail.roadbook,
-      directions: trail.directions,
-      parking: trail.parking,
-      tags: trail.tags || [],
-      coordinates: trail.coordinates,
-      location: trail.location?.coordinates
-        ? { lon: trail.location.coordinates[0], lat: trail.location.coordinates[1] }
-        : null
-    }));
-
-    visibleTrails.value = trails.value;
+      trails.value = response.data.map(trail => ({
+        id: trail._id,
+        title: trail.title,
+        description: trail.description || "Nessuna descrizione",
+        region: trail.region,
+        valley: trail.valley,
+        difficulty: trail.difficulty,
+        lengthKm: trail.lengthKm,
+        lengthLabel: `${trail.lengthKm} km`,
+        duration: trail.duration,
+        durationLabel: `${trail.duration.hours}h ${trail.duration.minutes}m`,
+        ascentM: trail.ascentM,
+        descentM: trail.descentM,
+        highestPointM: trail.highestPointM,
+        lowestPointM: trail.lowestPointM,
+        roadbook: trail.roadbook,
+        directions: trail.directions,
+        parking: trail.parking,
+        tags: trail.tags || [],
+        coordinates: trail.coordinates,
+        location: trail.location?.coordinates
+          ? { lon: trail.location.coordinates[0], lat: trail.location.coordinates[1] }
+          : null
+      }));
+     
+      visibleTrails.value = trails.value;
 
     /* 👇 TAG DINAMICI */
     fetchTags(trails.value);
 
-  } catch (err) {
-    console.error("Errore fetching trails:", err);
-  }
-};
+    } catch (err) {
+      console.error("Errore fetching trails:", err);
+    }
+  };
 
-/* WATCH QUERY */
-watch(
-  () => route.query,
-  fetchTrails,
-  { immediate: true }
-);
+  /* WATCH QUERY */
+  watch(
+    () => route.query,
+    fetchTrails,
+    { immediate: true }
+  );
 
-/* TAG HANDLER */
-const toggleTag = (tag) => {
-  if (selectedTags.value.includes(tag)) {
-    selectedTags.value = selectedTags.value.filter(t => t !== tag);
-  } else {
-    selectedTags.value.push(tag);
-  }
-  updateFilter("tags", selectedTags.value.join(","));
-};
+  /* TAG HANDLER */
+  const toggleTag = (tag) => {
+    if (selectedTags.value.includes(tag)) {
+      selectedTags.value = selectedTags.value.filter(t => t !== tag);
+    } else {
+      selectedTags.value.push(tag);
+    }
+    updateFilter("tags", selectedTags.value.join(","));
+  };
 
-/* UPDATE FILTER */
-const updateFilter = (key, value) => {
-  const query = { ...route.query };
-  if (!value || value.length === 0) delete query[key];
-  else query[key] = value;
-  router.replace({ query });
-};
+  /* UPDATE FILTER */
+  const updateFilter = (key, value) => {
+    const query = { ...route.query };
+    if (!value || value.length === 0) delete query[key];
+    else query[key] = value;
+    router.replace({ query });
+  };
 </script>
 
 
@@ -130,8 +149,23 @@ const updateFilter = (key, value) => {
         <img src="../assets/goon_logo.png" class="logo" />
       </div>
       <div class="header-right">
-        <router-link to="/login" class="login-btn">Login</router-link>
+      
+        <router-link v-if="!isLogged" to="/login" class="login-btn" >
+          Login
+        </router-link>
+       
+        <div v-else class="user-box">
+          <span class="user-id">
+            {{ userId }}
+          </span>
+         
+          <router-link to="/profile" class="login-btn" >
+          Profile
+        </router-link>
+        </div>
+       
       </div>
+
     </header>
 
     <!-- BODY -->
@@ -370,4 +404,12 @@ const updateFilter = (key, value) => {
   flex-direction: column;
   gap: 2px;
 }
+
+.user-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+
 </style>
