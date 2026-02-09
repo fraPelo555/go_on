@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 const userSchema = new mongoose.Schema({
   username: {
@@ -10,6 +10,10 @@ const userSchema = new mongoose.Schema({
     unique: true,
     match: /^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$/
   },
+  password: {
+    type: String,
+    required: true
+  },
   role: {
     type: String,
     enum: ["admin", "base"],
@@ -20,7 +24,8 @@ const userSchema = new mongoose.Schema({
       type: mongoose.Schema.Types.ObjectId,
       ref: "Trail" // riferimento al modello Trail
     }
-  ]
+  ],
+  default: []
 }, {
   timestamps: true,
   toJSON: { virtuals: true },
@@ -31,4 +36,6 @@ userSchema.virtual("id").get(function () {
   return this._id.toHexString();
 });
 
-export const User = mongoose.model("User", userSchema);
+const User = mongoose.model("User", userSchema);
+
+module.exports = { User };

@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 /* 
 Attenzione: 
@@ -134,7 +134,6 @@ const trailSchema = new Schema({
   lowestPointM: { 
     type: Number,
     default: 0,
-    min: 0 
   },
   tags: {
     type: [{ 
@@ -236,4 +235,6 @@ trailSchema.pre("save", async function (next) {
   }
 });
 
-export const Trail = mongoose.model("Trail", trailSchema);
+const Trail = mongoose.model("Trail", trailSchema);
+
+module.exports = { Trail };

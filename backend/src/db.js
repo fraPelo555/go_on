@@ -1,5 +1,5 @@
-import mongoose from "mongoose";
-import dotenv from "dotenv";
+const mongoose = require("mongoose");
+const dotenv = require("dotenv");
 
 dotenv.config();
 
@@ -8,7 +8,8 @@ if (!uri) {
   console.error("MONGO_URI non impostato in .env");
   process.exit(1);
 }
-export async function connectToMongo() {
+
+async function connectToMongo() {
   try {
     await mongoose.connect(uri);
     console.log("Connesso a MongoDB");
@@ -17,3 +18,7 @@ export async function connectToMongo() {
     process.exit(1);
   }
 }
+
+module.exports = {
+  connectToMongo,
+};

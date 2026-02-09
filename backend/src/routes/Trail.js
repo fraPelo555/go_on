@@ -1,28 +1,19 @@
-import express from "express";
-import { Trail } from "../models/Trail.js";
+const express = require("express");
+const { Trail } = require("../models/Trail");
+const { Feedback } = require("../models/Feedback");
+const { Report } = require("../models/Report");
+const { User } = require("../models/User");
+const { upload, uploadBaseDir } = require("./Storage");
 
-import multer from "multer";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
+const { tokenChecker } = require("../middlewares/TokenChecker");
+const { requireRole } = require("../middlewares/RequireRole");
+
+const fs = require("fs");
+const path = require("path");
+const { promisify } = require("util");
+const rm = promisify(fs.rm); // versione async
 
 const router = express.Router();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-const uploadBaseDir = path.join(__dirname, "../uploads"); // cartella base uploads
-if (!fs.existsSync(uploadBaseDir)) {
-  fs.mkdirSync(uploadBaseDir, { recursive: true });
-}
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadBaseDir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, file.originalname);
-  }
-});
-const upload = multer({ storage });
 
 // -------- GET /trails?filters --------
 router.get("/", async (req, res) => {
@@ -35,60 +26,65 @@ router.get("/", async (req, res) => {
       maxLength,
       minDuration,
       maxDuration,
-      tags
+      tags,
     } = req.query;
 
     const filter = {};
 
-    if(region) {
+    if (region) {
       filter.region = region;
     }
-    if(valley) {
+    if (valley) {
       filter.valley = valley;
     }
-    if(difficulty) {
+    if (difficulty) {
       filter.difficulty = difficulty;
     }
-    if(minLength) {
+    if (minLength) {
       filter.lengthKm = { ...filter.lengthKm, $gte: Number(minLength) };
     }
-    if(maxLength) {
+    if (maxLength) {
       filter.lengthKm = { ...filter.lengthKm, $lte: Number(maxLength) };
     }
 
-    const exprConditions = []; // serve creare un array per avere più espressioni
-    if(minDuration) {
+    const exprConditions = [];
+    if (minDuration) {
       exprConditions.push({
-        $gte: [{ 
-          $add: [{ 
-            $multiply: ["$duration.hours", 60] 
-          }, 
-          "$duration.minutes"] 
-        },
-        Number(minDuration)
-        ]
+        $gte: [
+          {
+            $add: [
+              {
+                $multiply: ["$duration.hours", 60],
+              },
+              "$duration.minutes",
+            ],
+          },
+          Number(minDuration),
+        ],
       });
     }
-    if(maxDuration) {
+    if (maxDuration) {
       exprConditions.push({
-        $lte: [{ 
-          $add: 
-          [{ 
-            $multiply: ["$duration.hours", 60] 
-          }, 
-          "$duration.minutes"] 
-        },
-        Number(maxDuration)
-        ]
+        $lte: [
+          {
+            $add: [
+              {
+                $multiply: ["$duration.hours", 60],
+              },
+              "$duration.minutes",
+            ],
+          },
+          Number(maxDuration),
+        ],
       });
     }
-    if(tags) {
+    if (tags) {
       const tagArray = Array.isArray(tags) ? tags : tags.split(",");
-      filter.tags = { 
-        $all: tagArray 
+      filter.tags = {
+        $all: tagArray,
       };
     }
-    if(exprConditions.length > 0) {
+    if (exprConditions.length > 0) {
       filter.$expr = { $and: exprConditions };
     }
     const trails = await Trail.find(filter);
@@ -99,57 +95,151 @@ router.get("/", async (req, res) => {
   }
 });
 
-router.post("/", upload.single("gpx"), async (req, res) => {
-  let trail;
-  try {
-    if (req.body.duration) {
-      req.body.duration = JSON.parse(req.body.duration);
+// -------- POST /trails --------
+router.post(
+  "/",
+  tokenChecker,
+  requireRole("admin"),
+  async (req, res) => {
+    try {
+      if (req.body.duration) {
+        req.body.duration = JSON.parse(req.body.duration);
+      }
+      if (req.body.coordinates) {
+        req.body.coordinates = JSON.parse(req.body.coordinates);
+      }
+      if (req.body.tags) {
+        req.body.tags = JSON.parse(req.body.tags);
+      }
+
+      const trail = new Trail(req.body);
+      await trail.save();
+
+      res.status(201).json(trail);
+    } catch (err) {
+      console.error(err);
+      res.status(400).json({ error: err.message });
     }
-    if (req.body.coordinates) {
-      req.body.coordinates = JSON.parse(req.body.coordinates);
+  },
+);
+
+// -------- PUT /trails/:id --------
+router.put(
+  "/:id",
+  tokenChecker,
+  requireRole("admin"),
+  async (req, res) => {
+    try {
+      if (req.body.duration) {
+        req.body.duration = JSON.parse(req.body.duration);
+      }
+      if (req.body.coordinates) {
+        req.body.coordinates = JSON.parse(req.body.coordinates);
+      }
+      if (req.body.tags) {
+        req.body.tags = JSON.parse(req.body.tags);
+      }
+
+      const trail = await Trail.findById(req.params.id);
+      if (!trail) {
+        return res.status(404).json({ error: "Trail not found" });
+      }
+
+      Object.assign(trail, req.body);
+      await trail.save();
+
+      res.json(trail);
+    } catch (err) {
+      console.error(err);
+      res.status(400).json({ error: err.message });
     }
-    if (req.body.tags) {
-      req.body.tags = JSON.parse(req.body.tags);
+  },
+);
+
+// -------- PUT /trails/:id/gpx --------
+router.put(
+  "/:id/gpx",
+  tokenChecker,
+  requireRole("admin"),
+  async (req, res, next) => {
+    try {
+      const trail = await Trail.findById(req.params.id);
+
+      if (!trail) {
+        return res.status(404).json({ error: "Trail not found" });
+      }
+
+      req.trailId = trail.id;
+      req.trail = trail;
+      next();
+    } catch (err) {
+      next(err);
     }
-    trail = new Trail(req.body);
-    await trail.save();
-    const trailDir = path.join(uploadBaseDir, trail.id.toString());
-    if (!fs.existsSync(trailDir)) {
-      fs.mkdirSync(trailDir);
-    }
-    if (!req.file) {
-      await Trail.findByIdAndDelete(trail.id);
-      fs.rmdirSync(trailDir, { recursive: true });
-      return res.status(400).json({ error: "Devi caricare un file .gpx" });
-    }
-    const ext = path.extname(req.file.originalname);
-    const newPath = path.join(trailDir, `track${ext}`);
-    fs.renameSync(req.file.path, newPath);
-    res.status(201).json({ trail, filePath: `/uploads/${trail.id}/track${ext}` });
-  } catch (err) {
-    console.error(err);
-    if(trail) {
-      await Trail.findByIdAndDelete(trail.id);
-      const trailDir = path.join(uploadBaseDir, trail.id.toString());
-      if (fs.existsSync(trailDir)) fs.rmdirSync(trailDir, { recursive: true });
-    }
-    res.status(500).json({ error: err.message });
+  },
+  (req, res) => {
+    upload.single("gpx")(req, res, (err) => {
+      if (err) {
+        return res.status(400).json({ error: err.message });
+      }
+      if (!req.file) {
+        return res.status(400).json({ error: "GPX file is required" });
+      }
+      return res.status(200).json({
+        message: "GPX caricato correttamente",
+        filePath: `/uploads/${req.trailId}/track.gpx`,
+      });
+    });
   }
-});
+);
+ 
+// -------- DELETE /trails/:id --------
+router.delete(
+  "/:id",
+  tokenChecker,
+  requireRole("admin"),
+  async (req, res) => {
+    const { id } = req.params;
+    try {
+      const trail = await Trail.findById(id);
+      if (!trail) {
+        return res.status(404).json({ error: "Trail not found" });
+      }
+
+      // Cancelliamo tutti i riferimenti nel DB
+      await Feedback.deleteMany({ idTrail: id });
+      await Report.deleteMany({ idTrail: id });
+      await User.updateMany({ favourites: id }, { $pull: { favourites: id } });
+      await Trail.findByIdAndDelete(id);
+
+      // Cancelliamo la cartella dei file in modo sicuro
+      const trailDir = path.join(uploadBaseDir, id.toString());
+      if (fs.existsSync(trailDir)) {
+        await rm(trailDir, { recursive: true, force: true });
+      }
+
+      return res.status(204).end();
+    } catch (err) {
+      console.error("Errore nella DELETE /trails/:id:", err);
+      return res.status(500).json({ error: "Server error" });
+    }
+  }
+);
 
 // -------- GET /trails/near?lat=&lon=&radius= --------
 router.get("/near", async (req, res) => {
   try {
     const { lat, lon, radius } = req.query;
-    if(!lat || !lon || !radius) {
-      return res.status(400).json({ error: "lat, lon and radius are required" });
+    if (!lat || !lon || !radius) {
+      return res
+        .status(400)
+        .json({ error: "lat, lon and radius are required" });
     }
     const trails = await Trail.find({
       location: {
         $geoWithin: {
-          $centerSphere: [[Number(lon), Number(lat)], Number(radius) / 6371] // raggio in km / raggio terrestre
-        }
-      }
+          $centerSphere: [[Number(lon), Number(lat)], Number(radius) / 6371], // raggio in km/raggio_terrestre
+        },
+      },
     });
     res.json(trails);
   } catch (err) {
@@ -162,7 +252,7 @@ router.get("/near", async (req, res) => {
 router.get("/:id", async (req, res) => {
   try {
     const trail = await Trail.findById(req.params.id);
-    if(!trail) {
+    if (!trail) {
       return res.status(404).json({ error: "Trail not found" });
     }
     res.json(trail);
@@ -172,82 +262,27 @@ router.get("/:id", async (req, res) => {
   }
 });
 
-// -------- PUT /trails/:id --------
-router.put("/:id", async (req, res) => {
-  try {
-    const trail = await Trail.findByIdAndUpdate(req.params.id, req.body, { new: true, runValidators: true });
-    if(!trail) {
-      return res.status(404).json({ error: "Trail not found" });
-    } 
-    res.json(trail);
-  } catch (err) {
-    console.error(err);
-    res.status(400).json({ error: err.message });
-  }
-});
-
-// -------- DELETE /trails/:id --------
-router.delete("/:id", async (req, res) => {
+// -------- GET /trails/:id/gpx --------
+router.get("/:id/gpx", async (req, res) => {
   const { id } = req.params;
+
   try {
     const trail = await Trail.findById(id);
     if (!trail) {
       return res.status(404).json({ error: "Trail not found" });
     }
 
-    // DELETE feedback
-    await Feedback.deleteMany({ idTrail: id });
+    const gpxPath = path.join(uploadBaseDir, id.toString(), "track.gpx");
 
-    // DELETE reports
-    await Report.deleteMany({ idTrail: id });
-
-    // REMOVE trail from favourites
-    await User.updateMany(
-      { favourites: id },
-      { $pull: { favourites: id } }
-    );
-
-    // DELETE trail
-    await Trail.findByIdAndDelete(id);
-
-    // DELETE files directory
-    const trailDir = path.join(uploadBaseDir, id.toString());
-    if (fs.existsSync(trailDir)) {
-      fs.rmSync(trailDir, { recursive: true, force: true });
-    }
-
-    return res.status(204).end();
-  } catch (err) {
-    console.error(err);
-    return res.status(500).json({ error: "Server error" });
-  }
-});
-
-// -------- GET /trails/:id/upload/gpx --------
-router.get("/:id/upload/gpx", async (req, res) => {
-  const { id } = req.params;
-  try {
-    const trail = await Trail.findById(id);
-    if (!trail) {
-      return res.status(404).json({ error: "Trail not found" });
-    }
-    // Directory della trail
-    const trailDir = path.join(uploadBaseDir, id.toString());
-    if (!fs.existsSync(trailDir)) {
-      return res.status(404).json({ error: "GPX not found" });
-    }
-    // Cerca un file che inizia per "track"
-    const files = fs.readdirSync(trailDir);
-    const gpxFile = files.find(file => file.startsWith("track"));
-    if (!gpxFile) {
+    if (!fs.existsSync(gpxPath)) {
       return res.status(404).json({ error: "GPX file not found" });
     }
-    const fullPath = path.join(trailDir, gpxFile);
-    return res.download(fullPath);
+
+    return res.download(gpxPath, "track.gpx");
   } catch (err) {
     console.error(err);
     return res.status(500).json({ error: "Server error" });
   }
 });
 
-export default router;
+module.exports = router;

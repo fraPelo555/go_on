@@ -5,8 +5,25 @@ Progetto/
 │     └─ frontend.yml
 ├─ backend/
 │  ├─ package.json
-│  ├─ package-lock.json (o pnpm-lock.yaml)
-│  └─ src/...
+│  ├─ package-lock.json
+│  └─ src/
+│     ├─ middlewares/
+│     │  ├─ requireRole.js
+│     │  ├─ selfOrAdmin.js
+│     │  └─ TokenChecker.js
+│     ├─ models/
+│     │  ├─ Feedback.js
+│     │  ├─ Report.js
+│     │  ├─ Trail.js
+│     │  └─ User.js
+│     ├─ routes/
+│     │  ├─ Feedback.js
+│     │  ├─ Report.js
+│     │  ├─ Trail.js
+│     │  └─ User.js
+│     ├─ uploads/
+│     ├─ app.js
+│     └─ db.js
 ├─ frontend/
 │  ├─ package.json
 │  ├─ package-lock.json
@@ -14,43 +31,93 @@ Progetto/
 ├─ .gitignore
 ├─ README.md
 
-Per creare un nuovo branch:
-- git checkout main
-- git pull origin main
-- git checkout -b nuovo_branch
-- fare add, commit e push verso nuovo_branch
-- git fetch origin
-- git checkout origin main
-- git merge origin/nuovo_branch
-- fare add, commit e il push per mettere il merge anche nel remoto
+Attenzione: 
+- Cartella .github/workflows viene creata automaticamente nel deployment.
 
-
-/////////////////////////
-//////// BACKEND ////////
-/////////////////////////
-
-Nel caso non si riesca a clonare il progetto:
+Per scaricare il progetto:
 1. git config --global credential.helper manager
-2. git clone https://github.com/Marco-Brunori/GO-ON.git
+2. gh auth login
+3. git clone "https://github.com/fraPelo555/go_on.git"
+4. git checkout -b backend origin/backend
+5. git checkout -b frontend origin/frontend
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////                                                 ////////////////////////////////
+////////////////////////////////                     BACKEND                     ////////////////////////////////
+////////////////////////////////                                                 ////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 Per avviare il progetto:
 1. npm install 
-2. creare file ".env" con all'interno l'utente
+2. creare file ".env" con le password
 3. npm run dev
 
+Per avviare i test:
+- npm run test 
+- npm run test -- tests/"NomeFile".test.js
+
+
 DA FARE BACKEND:
-- Ricollegare apiary e postman sul github nuovo
+- ricollegare apiary e postman sul github nuovo
 - authentication Google (e anche senza)
 - mettere i permessi alle API
-- fare github workflow
+- nella descrizione di Apiary il prof. descrive che il JWT può essere inserito tramite Header (x-access-token) e Query String. L'approccio moderno è utilizzare Bearer-token.
+- Cambiare l'API che quando si elimina un Utente si elimino anche i suoi Feedback e Report (si potrebbe invece inserire Utente eliminato), mentre se si elimina un Trail questo comportamento è corretto.
+- Non so il perchè ma quando si fa un post di un Trail vengono creati nella cartella uploads 2 file gpx, uno all'interno della propria cartella nominata dall'id del trail, ed uno esterno.
 
-//////////////////////////
-//////// FRONTEND ////////
-//////////////////////////
+
+API:
+- Trails
+    GET                     "/trails"       	                            Lista trail con filtri (region, valley, difficulty, tags, length, duration, ecc.)
+    POST                    "/trails"	                                    Creare un nuovo trail [Autenticazione+Admin]
+    PUT                     "/trails/{id}"      	                        Aggiornare un trail [Autenticazione+Admin] 
+    PUT                     "/trails/{id}/gpx"                              Upload/sostituzione del file gpx [Autenticazione+Admin]
+    DELETE	                "/trails/{id}"	                                Eliminare un trail [Autenticazione+Admin]
+    GET	                    "/trails/near"	                                Trovare tutti i trail entro un raggio da un punto geografico scelto
+    GET	                    "/trails/{id}"	                                Ottenere un trail tramite ID
+    GET	                    "/trails/{id}/gpx"	                            Fare il download file GPX di un trail
+
+- Reports       
+    POST	                "/reports/{idTrail}"	                        Crea un nuovo report [Autenticazione]
+    GET	                    "/reports/all"	                                Ottenere la lista di tutti i report [Autenticazione+Admin] 
+    GET	                    "/reports/{id}"	                                Ottenere un report tramite ID [Autenticazione]
+    DELETE	                "/reports/{id}"	                                Eliminare un report [AutenticazioneSelf,Autenticazione+Admin]
+    GET	                    "/reports/all/trail/{idTrail}"                  Ottenere tutti i report associati a un trail [Autenticazione] 
+    GET	                    "/reports/all/user/{idUser}"                    Ottenere tutti i report creati da un utente [AutenticazioneSelf,Autenticazione+Admin]
+
+- Feedbacks     
+    POST	                "/feedbacks/{idTrail}"                          Creare un feedback (1 per utente/trail) [AutenticazioneSelf]
+    GET	                    "/feedbacks/all"                                Ottenere la lista di tutti feedback [Autenticazione+Admin]
+    GET	                    "/feedbacks/{id}"	                            Ottenere un feedback tramite ID [Autenticazione]
+    PUT                     "/feedbacks/{id}"	                            Aggiornare un feedback [AutenticazioneSelf,Autenticazione+Admin]
+    DELETE	                "/feedbacks/{id}"	                            Eliminare un feedback [AutenticazioneSelf,Autenticazione+Admin]
+    GET 	                "/feedbacks/all/trail/{idTrail}"	            Ottenere tutti i feedback di una trail specifica [Autenticazione]
+    GET                     "/feedbacks/all/user/{idUser}"	                Ottenere tutti i feedback di un certo utente [AutenticazioneSelf,Autenticazione+Admin]
+
+- Users {DA FARE: modificare le API in modo che funzionino}
+    POST	                "/users"	                                    Crea un nuovo utente e restituisce un JWT {DA FARE: Test}
+    GET 	                "/users/all"                                    Lista di tutti gli utenti [Autenticazione+Admin] {DA FARE: Test}
+    GET	                    "/users/{id}"	                                Ottenere un utente [AutenticazioneSelf,Autenticazione+Admin] {DA FARE: Test}
+    PUT	                    "/users/{id}"	                                Aggiornare un utente [AutenticazioneSelf,Autenticazione+Admin] {DA FARE: Test}
+    DELETE                  "/users/{id}"	                                Eliminare un utente [AutenticazioneSelf,Autenticazione+Admin] {DA FARE: Test}
+    POST                    "/users/{idUser}/favourites/{idTrail}"          Aggiungere un trail ai preferiti di un certo utente [AutenticazioneSelf,Autenticazione+Admin] {DA FARE: Test}
+    DELETE                  "/users/{idUser}/favourites/{idTrail}"	        Rimuovere un trail dai preferiti di un certo utente [AutenticazioneSelf,Autenticazione+Admin] {DA FARE: Test}
+    GET 	                "/users/favourites/{idUser}"	                Ottenere la lista dei trail preferiti di un utente [AutenticazioneSelf,Autenticazione+Admin] {DA FARE: Test}
+
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////                                                 ////////////////////////////////
+////////////////////////////////                     Frontend                    ////////////////////////////////
+////////////////////////////////                                                 ////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 Per avviare il progetto: 
 1. npm install
 2. npm run dev
 
 DA FARE FRONTEND:
-- scheda descrittiva
+- Pagina Home
+- Pagina Login
+- Pagina Admin
+- Creare cheda descrittiva per un trail

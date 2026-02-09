@@ -1,81 +1,211 @@
-import express from "express";
-import { Report } from "../models/Report.js";
+const express = require("express");
+const mongoose = require("mongoose");
+
+const { Report } = require("../models/Report");
+const { Trail } = require("../models/Trail");
+const { User } = require("../models/User");
+
+const { tokenChecker } = require("../middlewares/TokenChecker");
+const { requireRole } = require("../middlewares/RequireRole");
+const { selfOrAdmin } = require("../middlewares/SelfOrAdmin");
 
 const router = express.Router();
 
-// -------- POST /reports --------
-router.post("/", async (req, res) => {
+// -------- POST /reports/:idTrail --------
+router.post("/:idTrail", tokenChecker, async (req, res) => {
   try {
+    const { idTrail } = req.params;
+    const { testo } = req.body;
+
+    if (!testo) {
+      return res.status(400).json({ message: "'text' is required" });
+    }
+
+    const trailExists = await Trail.exists({ _id: idTrail });
+    if (!trailExists) {
+      return res.status(404).json({ message: "Trail not found" });
+    }
+
     const report = new Report(req.body);
     await report.save();
     return res.status(201).json(report);
   } catch (error) {
-    return res.status(400).json({ message: error.message });
+    if (error.name === "ValidationError") {
+      return res.status(400).json({ message: error.message, errors: error.errors });
+    }
+    console.error(error);
+    return res.status(500).json({ message: "Internal server error" });
   }
 });
 
-// -------- GET /reports --------
-router.get("/", async (req, res) => {
+// -------- GET /reports/all?filter --------
+router.get("/all", tokenChecker, requireRole("admin"), async (req, res) => {
   try {
-    const reports = await Report.find();
+    const { state } = req.query;
+
+    let query = {};
+    if (state) {
+      const states = state.split(",").map((s) => s.trim());
+      query.state = { $in: states };
+    }
+
+    const reports = await Report.find(query);
     return res.status(200).json(reports);
   } catch (error) {
-    return res.status(500).json({ message: error.message });
+    console.error(error);
+    return res.status(500).json({ message: "Errore interno del server" });
   }
 });
 
 // -------- GET /reports/:id --------
-router.get("/:id", async (req, res) => {
+router.get("/:id", tokenChecker, async (req, res) => {
   try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Invalid report id" });
+    } 
+
+    const report = await Report.findById(req.params.id);
+
+    if (!report) {
+      return res.status(404).json({ message: "Report non trovato" });
+    }
+
+    return res.status(200).json(report);
+  } catch (error) {
+    console.error(error);
+    return res.status(500).json({ message: "Errore interno del server" });
+  }
+});
+
+// -------- PUT /reports/:id --------
+router.put(
+  "/:id",
+  tokenChecker,
+  async (req, res, next) => {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid report id" });
+    }
+
+    const report = await Report.findById(id);
+    if (!report) {
+      return res.status(404).json({ message: "Report not found" });
+    }
+
+    req.report = report;
+    next();
+  },
+  selfOrAdmin((req) => req.report.idUser),
+  async (req, res) => {
+    try {
+      const allowedFields = req.user.role === "admin" ? ["testo", "state"] : ["testo"];
+
+      const update = {};
+
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) {
+          update[field] = req.body[field];
+        }
+      }
+
+      if (Object.keys(update).length === 0) {
+        return res.status(400).json({ message: "No valid fields to update" });
+      }
+
+      Object.assign(req.report, update);
+      await req.report.save(); 
+
+      return res.status(200).json(req.report);
+    } catch (error) {
+      if (error.name === "ValidationError") {
+        return res.status(400).json({
+          message: error.message,
+          errors: error.errors,
+        });
+      }
+      console.error(error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+);
+
+// -------- DELETE /reports/:id --------
+router.delete(
+  "/:id",
+  tokenChecker,
+  async (req, res, next) => {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Invalid report id" });
+    }
+
     const report = await Report.findById(req.params.id);
     if (!report) {
       return res.status(404).json({ message: "Report not found" });
     }
-    return res.status(200).json(report);
-  } catch (error) {
-    return res.status(500).json({ message: error.message });
-  }
-});
 
-// -------- DELETE /reports/:id --------
-router.delete("/:id", async (req, res) => {
-  try {
-    const deleted = await Report.findByIdAndDelete(req.params.id);
-
-    if (!deleted) {
-      return res.status(404).json({ message: "Report not found" });
-    }
-
+    req.report = report;
+    next();
+  },
+  selfOrAdmin((req) => req.report.idUser),
+  async (req, res) => {
+    await req.report.deleteOne();
     return res.status(204).send();
-  } catch (error) {
-    return res.status(500).json({ message: error.message });
   }
-});
+);
 
-// -------- GET /reports/trail/:idTrail --------
-router.get("/trail/:idTrail", async (req, res) => {
+// -------- GET /reports/all/trail/:idTrail --------
+router.get("/all/trail/:idTrail", tokenChecker, async (req, res) => {
   try {
-    const reports = await Report.find({ idTrail: req.params.idTrail });
-    if (!reports.length) {
-      return res.status(404).json({ message: "Trail not found or no reports available" });
+    const { idTrail } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(idTrail)) {
+      return res.status(400).json({ message: "Invalid trail id" });
     }
+
+    const trailExists = await Trail.exists({ _id: idTrail });
+    if (!trailExists) return res.status(404).json({ message: "Trail not found" });
+
+    const reports = await Report.find({ idTrail });
     return res.status(200).json(reports);
   } catch (error) {
-    return res.status(500).json({ message: error.message });
+    console.error(error);
+    return res.status(500).json({ message: "Errore interno del server" });
   }
 });
 
-// -------- GET /reports/user/:idUser --------
-router.get("/user/:idUser", async (req, res) => {
-  try {
-    const reports = await Report.find({ idUser: req.params.idUser });
-    if (!reports.length) {
-      return res.status(404).json({ message: "User not found or no reports available" });
+// -------- GET /reports/all/user/:idUser --------
+router.get(
+  "/all/user/:idUser",
+  tokenChecker,
+
+  async (req, res, next) => {
+    const { idUser } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(idUser)) {
+      return res.status(400).json({ message: "Invalid user id" });
     }
-    return res.status(200).json(reports);
-  } catch (error) {
-    return res.status(500).json({ message: error.message });
-  }
-});
 
-export default router;
+    const user = await User.findById(idUser);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    req.targetUser = user;
+    next();
+  },
+
+  selfOrAdmin((req) => req.targetUser._id),
+
+  async (req, res) => {
+    try {
+      const reports = await Report.find({ idUser: req.targetUser._id });
+      return res.status(200).json(reports);
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({ message: "Errore interno del server" });
+    }
+  }
+);
+
+module.exports = router;

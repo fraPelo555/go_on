@@ -1,4 +1,4 @@
-import mongoose from "mongoose";
+const mongoose = require("mongoose");
 
 const { Schema } = mongoose;
 
@@ -50,4 +50,6 @@ reportSchema.virtual("id").get(function () {
 reportSchema.index({ idUser: 1 });
 reportSchema.index({ idTrail: 1 });
 
-export const Report = mongoose.model("Report", reportSchema);
+const Report = mongoose.model("Report", reportSchema);
+
+module.exports = { Report };
