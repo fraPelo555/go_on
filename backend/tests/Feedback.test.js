@@ -271,7 +271,11 @@ describe("GET /feedbacks/all", () => {
         expect.objectContaining({ valutazione: 3, testo: "Discreto" }),
       ]),
     );
-    expect(normalize(res.body)).toMatchSnapshot();
+    const sorted = normalize(res.body).sort(
+      (a, b) => a.valutazione - b.valutazione,
+    );
+
+    expect(sorted).toMatchSnapshot();
   });
 
   it("200 - filtro per valutazione", async () => {
@@ -282,7 +286,7 @@ describe("GET /feedbacks/all", () => {
     expect(res.status).toBe(200);
     expect(res.body.length).toBe(1);
     expect(res.body[0].valutazione).toBe(5);
-    expect(normalize([res.body])).toMatchSnapshot();
+    expect(normalize(res.body)).toMatchSnapshot();
   });
 
   it("400 - filtro valutazione non valido", async () => {

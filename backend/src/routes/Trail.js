@@ -130,14 +130,21 @@ router.put(
   requireRole("admin"),
   async (req, res) => {
     try {
-      if (req.body.duration) {
-        req.body.duration = JSON.parse(req.body.duration);
+      const parseIfString = (value) => {
+        if (typeof value === "string") {
+          return JSON.parse(value);
+        }
+        return value;
+      };
+
+      if (req.body.duration !== undefined) {
+        req.body.duration = parseIfString(req.body.duration);
       }
-      if (req.body.coordinates) {
-        req.body.coordinates = JSON.parse(req.body.coordinates);
+      if (req.body.coordinates !== undefined) {
+        req.body.coordinates = parseIfString(req.body.coordinates);
       }
-      if (req.body.tags) {
-        req.body.tags = JSON.parse(req.body.tags);
+      if (req.body.tags !== undefined) {
+        req.body.tags = parseIfString(req.body.tags);
       }
 
       const trail = await Trail.findById(req.params.id);
@@ -145,7 +152,48 @@ router.put(
         return res.status(404).json({ error: "Trail not found" });
       }
 
-      Object.assign(trail, req.body);
+      const allowedFields = [
+        "title",
+        "description",
+        "region",
+        "valley",
+        "difficulty",
+        "lengthKm",
+        "duration",
+        "roadbook",
+        "directions",
+        "parking",
+        "ascentM",
+        "descentM",
+        "highestPointM",
+        "lowestPointM",
+        "tags",
+        "coordinates"
+      ];
+
+      for (const field of allowedFields) {
+        if (req.body[field] !== undefined) {
+          trail[field] = req.body[field];
+        }
+      }
+
+      const forbiddenFields = [
+        "_id",
+        "id",
+        "idAdmin",
+        "location",
+        "createdAt",
+        "updatedAt"
+      ];
+
+      for (const field of forbiddenFields) {
+        if (field in req.body) {
+          return res.status(400).json({
+            error: `Il campo '${field}' non è modificabile`
+          });
+        }
+      }
+
       await trail.save();
 
       res.json(trail);
@@ -153,8 +201,9 @@ router.put(
       console.error(err);
       res.status(400).json({ error: err.message });
     }
-  },
+  }
 );
+
 
 // -------- PUT /trails/:id/gpx --------
 router.put(
@@ -205,13 +254,11 @@ router.delete(
         return res.status(404).json({ error: "Trail not found" });
       }
 
-      // Cancelliamo tutti i riferimenti nel DB
       await Feedback.deleteMany({ idTrail: id });
       await Report.deleteMany({ idTrail: id });
       await User.updateMany({ favourites: id }, { $pull: { favourites: id } });
       await Trail.findByIdAndDelete(id);
 
-      // Cancelliamo la cartella dei file in modo sicuro
       const trailDir = path.join(uploadBaseDir, id.toString());
       if (fs.existsSync(trailDir)) {
         await rm(trailDir, { recursive: true, force: true });

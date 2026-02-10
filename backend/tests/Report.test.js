@@ -251,7 +251,10 @@ describe("GET /reports/all", () => {
     expect(res.statusCode).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
     expect(res.body).toHaveLength(3);
-    expect(normalize(res.body)).toMatchSnapshot();
+    const sorted = normalize(res.body).sort((a, b) =>
+      a.state.localeCompare(b.state)
+    );
+    expect(sorted).toMatchSnapshot();
   });
 
   it("200 - filtro state=New", async () => {
@@ -275,7 +278,10 @@ describe("GET /reports/all", () => {
 
     const states = res.body.map((r) => r.state);
     expect(states).toEqual(expect.arrayContaining(["New", "Resolved"]));
-    expect(normalize([res.body])).toMatchSnapshot();
+    const sorted = normalize(res.body).sort((a, b) =>
+  a.state.localeCompare(b.state)
+);
+expect(sorted).toMatchSnapshot();
   });
 
   it("200 - filtro senza match", async () => {
@@ -601,7 +607,7 @@ describe("DELETE /reports/:id (improved)", () => {
   });
 });
 
-describe("GET /reports/all/trail/:idTrail (updated)", () => {
+describe("GET /reports/all/trail/:idTrail", () => {
   let token;
   let user;
   let trailWithReports;
@@ -700,7 +706,10 @@ describe("GET /reports/all/trail/:idTrail (updated)", () => {
 
     const texts = res.body.map((r) => r.testo);
     expect(texts).toEqual(expect.arrayContaining(["Report 1", "Report 2"]));
-    expect(normalize(res.body)).toMatchSnapshot();
+    const sorted = normalize(res.body).sort((a, b) =>
+      a.state.localeCompare(b.state)
+    );
+    expect(sorted).toMatchSnapshot();
   });
 
   it("200 - più report sullo stesso trail", async () => {
@@ -717,7 +726,10 @@ describe("GET /reports/all/trail/:idTrail (updated)", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.body).toHaveLength(3);
-    expect(normalize(res.body)).toMatchSnapshot();
+    const sorted = normalize(res.body).sort((a, b) =>
+      a.state.localeCompare(b.state)
+    );
+    expect(sorted).toMatchSnapshot();
   });
 });
 
@@ -808,7 +820,10 @@ describe("GET /reports/all/user/:idUser", () => {
     expect(res.body).toHaveLength(2);
     const texts = res.body.map((r) => r.testo);
     expect(texts).toEqual(expect.arrayContaining(["Report 1", "Report 2"]));
-    expect(normalize(res.body)).toMatchSnapshot();
+    const sorted = normalize(res.body).sort((a, b) =>
+      a.state.localeCompare(b.state)
+    );
+    expect(sorted).toMatchSnapshot();
   });
 
   it("200 - admin legge i report di un user", async () => {
@@ -818,7 +833,10 @@ describe("GET /reports/all/user/:idUser", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.body).toHaveLength(2);
-    expect(normalize(res.body)).toMatchSnapshot();
+    const sorted = normalize(res.body).sort((a, b) =>
+      a.state.localeCompare(b.state)
+    );
+    expect(sorted).toMatchSnapshot();
   });
 
   it("200 - user esistente senza report", async () => {
