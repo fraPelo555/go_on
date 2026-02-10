@@ -1,6 +1,7 @@
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
+const mongoose = require("mongoose");
 const { OAuth2Client } = require("google-auth-library");
 
 const { User } = require("../models/User");
@@ -17,74 +18,16 @@ const router = express.Router();
 const dotenv = require("dotenv");
 dotenv.config();
 
-// Versione senza autenticazione google, ma con jwt token
 // -------- POST /users --------
-/*
-router.post("/", async (req, res) => {
-  try {
-    const { username, email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ success: false, message: "Email and password are required" });
-    }
-
-    let user = await User.findOne({ email });
-
-    if (user) {
-      const validPassword = await bcrypt.compare(password, user.password);
-      if (!validPassword) {
-        return res.status(401).json({ success: false, message: "Authentication failed. Wrong password." });
-      }
-    } else {
-      const hashedPassword = await bcrypt.hash(password, 10);
-
-      user = new User({
-        username,
-        email,
-        password: hashedPassword,
-      });
-
-      await user.save();
-    }
-
-    const payload = {
-      id: user._id.toString(),
-      username: user.username,
-      email: user.email,
-    };
-
-    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "24h" });
-
-    res.status(user.isNew ? 201 : 200).json({
-      success: true,
-      message: user.isNew ? "User created and authenticated" : "User authenticated",
-      token,
-      id: user._id,
-      email: user.email,
-      username: user.username,
-    });
-
-  } catch (error) {
-    console.error(error);
-    if (error.name === "ValidationError") {
-      return res.status(400).json({ success: false, message: error.message, errors: error.errors });
-    }
-    return res.status(500).json({ success: false, message: "Internal server error" });
-  }
-});
-*/
-// Versione completa
 function getGoogleClient() {
   return new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 }
-
-// -------- POST /users --------
 router.post("/", async (req, res) => {
   try {
     let user;
     let isNewUser = false;
     const { username, email, password, googleToken } = req.body;
-    
+
     if (googleToken) {
       const client = getGoogleClient();
 
@@ -102,7 +45,7 @@ router.post("/", async (req, res) => {
       if (!user) {
         const placeholderPassword = await bcrypt.hash(
           "default-google-password-to-be-changed",
-          10
+          10,
         );
 
         user = new User({
@@ -152,7 +95,7 @@ router.post("/", async (req, res) => {
       username: user.username,
       email: user.email,
       role: user.role,
-      self: `api/v1/users/${user._id}`,
+      self: `/`,
     };
 
     const token = jwt.sign(jwtPayload, process.env.JWT_SECRET, {
@@ -170,7 +113,6 @@ router.post("/", async (req, res) => {
       username: user.username,
       role: user.role,
     });
-
   } catch (error) {
     console.error(error);
 
@@ -191,7 +133,10 @@ router.post("/", async (req, res) => {
 });
 
 // -------- GET /users/all --------
-router.get("/all", tokenChecker, requireRole("admin"), async (req, res) => {
+router.get("/all", 
+  tokenChecker, 
+  requireRole("admin"), 
+  async (req, res) => {
   try {
     const users = await User.find().select("-password");
 
@@ -216,13 +161,11 @@ router.get(
   tokenChecker,
   async (req, res, next) => {
     const { id } = req.params;
-
     if (!mongoose.Types.ObjectId.isValid(id)) {
       return res
         .status(400)
         .json({ success: false, message: "Invalid user id" });
     }
-
     try {
       const user = await User.findById(id).select("-password");
       if (!user) {
@@ -230,18 +173,15 @@ router.get(
           .status(404)
           .json({ success: false, message: "User not found" });
       }
-
       req.targetUser = user;
       next();
     } catch (error) {
       console.error(error);
-      return res
-        .status(500)
-        .json({
-          success: false,
-          message: "Internal server error",
-          error: error.message,
-        });
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message
+      });
     }
   },
   selfOrAdmin((req) => req.targetUser._id),
@@ -292,21 +232,17 @@ router.put(
     } catch (error) {
       console.error(error);
       if (error.name === "ValidationError") {
-        return res
-          .status(400)
-          .json({
-            success: false,
-            message: error.message,
-            errors: error.errors,
-          });
-      }
-      res
-        .status(500)
-        .json({
+        return res.status(400).json({
           success: false,
-          message: "Internal server error",
-          error: error.message,
+          message: error.message,
+          errors: error.errors,
         });
+      }
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
     }
   },
 );
@@ -315,40 +251,41 @@ router.put(
 router.delete(
   "/:id",
   tokenChecker,
-  selfOrAdmin((req) => req.params.id),
+  selfOrAdmin(async (req) => req.params.id),
   async (req, res) => {
-    const { id } = req.params;
-
-    if (!mongoose.Types.ObjectId.isValid(id)) {
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid user id" });
-    }
-
     try {
+      const { id } = req.params;
+
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid user id",
+        });
+      }
+
       const user = await User.findById(id);
       if (!user) {
-        return res
-          .status(404)
-          .json({ success: false, message: "User not found" });
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
       }
 
       await Feedback.deleteMany({ idUser: id });
       await Report.deleteMany({ idUser: id });
       await User.findByIdAndDelete(id);
 
-      return res.status(204).send();
-    } catch (error) {
-      console.error(error);
-      return res
-        .status(500)
-        .json({
-          success: false,
-          message: "Internal server error",
-          error: error.message,
-        });
+      return res.status(200).json({
+        success: true,
+        message: "User deleted successfully",
+      });
+    } catch (err) {
+      return res.status(500).json({
+        success: false,
+        message: err.message,
+      });
     }
-  },
+  }
 );
 
 // -------- POST /users/:idUser/favourites/:idTrail --------
@@ -398,13 +335,11 @@ router.post(
       });
     } catch (error) {
       console.error(error);
-      return res
-        .status(500)
-        .json({
-          success: false,
-          message: "Internal server error",
-          error: error.message,
-        });
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
     }
   },
 );
@@ -447,13 +382,11 @@ router.delete(
       return res.status(204).send();
     } catch (error) {
       console.error(error);
-      return res
-        .status(500)
-        .json({
-          success: false,
-          message: "Internal server error",
-          error: error.message,
-        });
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
     }
   },
 );
@@ -487,13 +420,11 @@ router.get(
       });
     } catch (error) {
       console.error(error);
-      return res
-        .status(500)
-        .json({
-          success: false,
-          message: "Internal server error",
-          error: error.message,
-        });
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
     }
   },
 );
