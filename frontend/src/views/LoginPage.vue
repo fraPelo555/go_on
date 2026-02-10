@@ -1,92 +1,120 @@
 <script setup>
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import api from "../api/axios";
+import api from "../api/axios"; // axios già configurato con baseURL
 
 const router = useRouter();
 
 const username = ref("");
 const password = ref("");
+const email = ref("");  
 const error = ref("");
+const user = ref(null);
 
-const handleLogin = () => {
+const clientId = "1061830322603-4qocdffrh9aseguk1o7f6j0aj7dfgadf.apps.googleusercontent.com"; // Inserisci qui il tuo Client ID Google
 
-  // MOCK AUTH
-  localStorage.setItem("token", "FAKE_JWT_TOKEN");
-  localStorage.setItem("userId", username.value || "mockUser123");
+// ==========================
+// HANDLE LOGIN / CREATE USER
+// ==========================
+const handleLogin = async () => {
+  error.value = "";
 
-  // cambia true / false per testare
-  localStorage.setItem("isAdmin", username.value === "admin");
+  if (!username.value.trim() || !password.value.trim() || !email.value.trim()) {
+    error.value = "Username, password e email sono obbligatori";
+    return;
+  }
 
-  // redirect
-  router.push("/");
+  try {
+    const payload = {
+      username: username.value.trim(),
+      password: password.value,
+      email: email.value.trim(),
+      role: "admin"
+    };
+
+    const res = await api.post("/users", payload);
+    const newUser = res.data;
+
+    // Salvataggio token e info locali
+    localStorage.setItem("token", newUser.token || "mock-token");
+    localStorage.setItem("userId", newUser.id);
+    localStorage.setItem("isAdmin", newUser.role === "admin");
+    localStorage.setItem("username", newUser.username);
+
+    router.push("/");
+
+  } catch (err) {
+    console.error("Errore login/creazione utente:", err);
+    error.value = err.response?.data?.message || "Errore durante la creazione dell'utente";
+  }
 };
 
+// ==========================
+// HANDLE GOOGLE LOGIN
+// ==========================
+const handleGoogleResponse = async (response) => {
+  console.log("JWT ricevuto da Google:", response.credential);
 
-// da scommentare per fare il login serio, sopra è un mock
-// const handleLogin = async () => {
-//   error.value = "";
+  try {
+    // POST a /users con googleToken
+    const res = await api.post("/users", { googleToken: response.credential });
+    const googleUser = res.data;
 
-//   try {
-//     // 👉 CHIAMATA BACKEND
-//     const res = await api.post("/auth/login", {
-//       username: username.value,
-//       password: password.value
-//     });
+    // Salvataggio info locali
+    localStorage.setItem("token", googleUser.token || "mock-token");
+    localStorage.setItem("userId", googleUser.id);
+    localStorage.setItem("username", googleUser.username);
+    localStorage.setItem("email", googleUser.email);
 
-//     /*
-//       Backend risponde tipo:
-//       {
-//         token: "...",
-//         userId: "...",
-//         isAdmin: true
-//       }
-//     */
+    // Redirect alla pagina dell'utente
+    router.push("/");
+  } catch (err) {
+    console.error("Errore login Google:", err);
+    error.value = err.response?.data?.message || "Errore durante il login con Google";
+  }
+};
 
-//     const { token, userId, isAdmin } = res.data;
+// ==========================
+// INITIALIZE GOOGLE BUTTON
+// ==========================
+const handleGoogleSignup = () => {
+  google.accounts.id.prompt(); // mostra il One Tap / popup
+};
 
-//     // 👉 SALVATAGGIO STATO
-//     localStorage.setItem("token", token);
-//     localStorage.setItem("userId", userId);
-//     localStorage.setItem("isAdmin", isAdmin);
+onMounted(() => {
+  // Funzione globale richiesta da Google
+  window.handleCredentialResponse = handleGoogleResponse;
 
-//     // 👉 VAI ALLA HOME
-//     router.push("/");
+  google.accounts.id.initialize({
+    client_id: clientId,
+    callback: handleGoogleResponse,
+  });
 
-//   } catch (err) {
-//     error.value = "Credenziali non valide";
-//   }
-// };
+  // Render del pulsante Google classico (opzionale se vuoi anche il bottone)
+  google.accounts.id.renderButton(
+    document.querySelector(".google-btn"),
+    { theme: "outline", size: "large", text: "signin_with" }
+  );
+});
 </script>
-
-
 
 <template>
   <div class="login-page">
-
     <!-- HEADER -->
     <header class="header">
       <div class="header-left"></div>
 
       <div class="header-center">
-        <img
-          src="../assets/goon_logo.png"
-          alt="GO-ON Logo"
-          class="logo"
-        />
+        <img src="../assets/goon_logo.png" alt="GO-ON Logo" class="logo" />
       </div>
 
       <div class="header-right">
-        <!-- Torna alla Home -->
-        <router-link to="/" class="home-btn">
-          Home
-        </router-link>
+        <router-link to="/" class="home-btn">Home</router-link>
       </div>
     </header>
 
     <!-- BODY -->
     <main class="login-body">
-
       <!-- LEFT TITLE -->
       <section class="left-section">
         <h1>Login</h1>
@@ -97,50 +125,36 @@ const handleLogin = () => {
 
       <!-- CENTER FORM -->
       <section class="center-section">
-
         <div class="form">
-
           <label>
             Username
-            <input
-              type="text"
-              v-model="username"
-              placeholder="Inserisci username"
-            />
+            <input type="text" v-model="username" placeholder="Inserisci username" />
+          </label>
+
+          <label>
+            Email *
+            <input type="email" v-model="email" placeholder="Inserisci email" />
           </label>
 
           <label>
             Password
-            <input
-              type="password"
-              v-model="password"
-              placeholder="Inserisci password"
-            />
+            <input type="password" v-model="password" placeholder="Inserisci password" />
           </label>
 
-          <a href="#" class="forgot">
-            Forgot password?
-          </a>
-
           <button class="login-btn" @click="handleLogin">
-            Login
+            Login / Crea Utente
           </button>
+
           <p v-if="error" style="color:red">{{ error }}</p>
-
         </div>
-
       </section>
-
 
       <!-- RIGHT SECTION -->
       <section class="right-section">
-        <button class="google-btn" @click="handleGoogleSignup">
-          Sign up with Google
-        </button>
+        <!-- Questo div sarà sostituito dal pulsante Google -->
+        <div class="google-btn"></div>
       </section>
-
     </main>
-
   </div>
 </template>
 
@@ -169,6 +183,7 @@ const handleLogin = () => {
 .header-right {
   display: flex;
   justify-content: flex-end;
+  gap: 12px;
 }
 
 .home-btn {
@@ -250,11 +265,6 @@ input {
 }
 
 .google-btn {
-  height: 48px;
-  padding: 0 24px;
-  background-color: #db4437;
-  color: white;
-  border: none;
-  cursor: pointer;
+  margin-top: 20px;
 }
 </style>

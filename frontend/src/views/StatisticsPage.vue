@@ -1,7 +1,39 @@
 <script setup>
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
+import { useRouter } from "vue-router";
+import { getUserById } from "../services/userService";
 
-/* Mock data */
+/* =========================
+   ADMIN GUARD
+   ========================= */
+const router = useRouter();
+
+const isAuthorized = ref(false);
+const authError = ref("");
+
+const checkAdminAccess = async () => {
+  const token = localStorage.getItem("token");
+  const userId = localStorage.getItem("userId");
+  const isAdmin = localStorage.getItem("isAdmin");
+
+  if (!token || !userId) {
+    authError.value = "Devi essere loggato per accedere a questa pagina.";
+    return;
+  }
+
+  if (isAdmin !== "true") {
+    authError.value = "Accesso negato: permessi amministratore richiesti.";
+    return;
+  }
+
+  isAuthorized.value = true;
+};
+
+onMounted(checkAdminAccess);
+
+/* =========================
+   STATISTICHE MOCK
+   ========================= */
 const stats = ref({
   totalRoutes: 124,
   createdMonth: 12,
@@ -45,90 +77,104 @@ const tags = ref([
 </script>
 
 <template>
-  <div class="stats-page">
+  <div>
+    <!-- UTENTI NON AUTORIZZATI -->
+    <div v-if="authError" class="auth-error">
+      <h2>⛔ Accesso non autorizzato</h2>
+      <p>{{ authError }}</p>
+      <router-link to="/" class="back-btn">Torna alla Home</router-link>
+    </div>
 
-    <!-- HEADER -->
-    <header class="header">
-      <div class="header-left">
-       <router-link to="/new-track" class="nav-btn">New Track</router-link>
-      </div>
-      
-      <div class="header-center">
-       <img src="../assets/goon_logo.png" class="logo" alt="GO-ON Logo" />
-      </div>
-      
-      <div class="header-right">
-       <router-link to="/" class="nav-btn">Home</router-link>
-        <router-link to="/profile" class="nav-btn">Profilo</router-link>
-      </div>
-    </header>
+    <div v-else-if="!isAuthorized">
+      <p>Verifica permessi in corso...</p>
+    </div>
 
-    <!-- BODY -->
-    <main class="grid">
+    <!-- PAGINA STATISTICHE -->
+    <div v-else class="stats-page">
 
-      <!-- [0][0] -->
-      <div class="card">
-        <div class="row"><span>Total Routes</span><span>{{ stats.totalRoutes }}</span></div>
-        <div class="row"><span>Created This Month</span><span>{{ stats.createdMonth }}</span></div>
-        <div class="row"><span>Modified This Month</span><span>{{ stats.modifiedMonth }}</span></div>
-        <div class="row"><span>Registered Users</span><span>{{ stats.users }}</span></div>
-        <div class="row"><span>Registrations This Month</span><span>{{ stats.usersMonth }}</span></div>
-      </div>
-
-      <!-- [1][0] -->
-      <div class="card center">
-        <h3>Media Globale Recensioni</h3>
-        <div class="stars">
-          <span v-for="n in 5" :key="n">
-            {{ n <= stats.avgRating ? "★" : "☆" }}
-          </span>
+      <!-- HEADER -->
+      <header class="header">
+        <div class="header-left">
+          <router-link to="/new-track" class="nav-btn">New Track</router-link>
         </div>
-      </div>
 
-      <!-- [0][1] -->
-      <div class="card">
-        <h3>Tracce più commentate</h3>
-        <input v-for="(t,i) in mostCommented" :key="i" :value="t" readonly />
-      </div>
-
-      <!-- [1][1] -->
-      <div class="card center">
-        <h3>Sentieri con traccia GPX</h3>
-        <div class="pie">
-          {{ stats.gpxPercent }}%
+        <div class="header-center">
+          <img src="../assets/goon_logo.png" class="logo" alt="GO-ON Logo" />
         </div>
-      </div>
 
-      <!-- [0][2] -->
-      <div class="card">
-        <h3>Tag più utilizzati</h3>
-        <div class="tags">
-          <span v-for="(t,i) in tags" :key="i">{{ t }}</span>
+        <div class="header-right">
+          <router-link to="/" class="nav-btn">Home</router-link>
+          <router-link to="/profile" class="nav-btn">Profilo</router-link>
         </div>
-      </div>
+      </header>
 
-      <!-- [1][2] -->
-      <div class="card">
-        <h3>Tracce più visualizzate</h3>
-        <input v-for="(t,i) in mostViewed" :key="i" :value="t" readonly />
-      </div>
+      <!-- GRID -->
+      <main class="grid">
 
-      <!-- [0][3] -->
-      <div class="card">
-        <h3>Tracce più segnalate</h3>
-        <input v-for="(t,i) in mostReported" :key="i" :value="t" readonly />
-      </div>
-
-      <!-- [1][3] -->
-      <div class="card center">
-        <h3>Sentieri con foto</h3>
-        <div class="pie">
-          {{ stats.photoPercent }}%
+        <!-- STATISTICHE GENERALI -->
+        <div class="card">
+          <div class="row"><span>Total Routes</span><span>{{ stats.totalRoutes }}</span></div>
+          <div class="row"><span>Created This Month</span><span>{{ stats.createdMonth }}</span></div>
+          <div class="row"><span>Modified This Month</span><span>{{ stats.modifiedMonth }}</span></div>
+          <div class="row"><span>Registered Users</span><span>{{ stats.users }}</span></div>
+          <div class="row"><span>Registrations This Month</span><span>{{ stats.usersMonth }}</span></div>
         </div>
-      </div>
 
-    </main>
+        <!-- MEDIA RECENSIONI -->
+        <div class="card center">
+          <h3>Media Globale Recensioni</h3>
+          <div class="stars">
+            <span v-for="n in 5" :key="n">{{ n <= stats.avgRating ? "★" : "☆" }}</span>
+          </div>
+        </div>
 
+        <!-- TRACCE PIÙ COMMENTATE -->
+        <div class="card">
+          <h3>Tracce più commentate</h3>
+          <div v-for="(t,i) in mostCommented" :key="`commented-${i}`">
+            <input :value="t" readonly />
+          </div>
+        </div>
+
+        <!-- SENTIERI GPX -->
+        <div class="card center">
+          <h3>Sentieri con traccia GPX</h3>
+          <div class="pie">{{ stats.gpxPercent }}%</div>
+        </div>
+
+        <!-- TAG PIÙ UTILIZZATI -->
+        <div class="card">
+          <h3>Tag più utilizzati</h3>
+          <div class="tags">
+            <span v-for="(t,i) in tags" :key="`tag-${i}`">{{ t }}</span>
+          </div>
+        </div>
+
+        <!-- TRACCE PIÙ VISUALIZZATE -->
+        <div class="card">
+          <h3>Tracce più visualizzate</h3>
+          <div v-for="(t,i) in mostViewed" :key="`viewed-${i}`">
+            <input :value="t" readonly />
+          </div>
+        </div>
+
+        <!-- TRACCE PIÙ SEGNALATE -->
+        <div class="card">
+          <h3>Tracce più segnalate</h3>
+          <div v-for="(t,i) in mostReported" :key="`reported-${i}`">
+            <input :value="t" readonly />
+          </div>
+        </div>
+
+        <!-- SENTIERI CON FOTO -->
+        <div class="card center">
+          <h3>Sentieri con foto</h3>
+          <div class="pie">{{ stats.photoPercent }}%</div>
+        </div>
+
+      </main>
+
+    </div>
   </div>
 </template>
 
@@ -205,10 +251,6 @@ const tags = ref([
   width: 120px;
   height: 120px;
   border-radius: 50%;
-  background: conic-gradient(
-    #2c7be5 {{ stats.gpxPercent }}%,
-    #ddd 0
-  );
   display: flex;
   align-items: center;
   justify-content: center;
@@ -232,5 +274,24 @@ input {
   padding: 4px 8px;
   background: #eee;
   border-radius: 4px;
+}
+
+/* Error */
+.auth-error {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.back-btn {
+  margin-top: 16px;
+  padding: 8px 16px;
+  background: #2c7be5;
+  color: white;
+  text-decoration: none;
+  border-radius: 6px;
 }
 </style>

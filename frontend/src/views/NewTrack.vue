@@ -1,423 +1,278 @@
 <script setup>
-import { ref } from "vue";
+import { ref, onMounted } from "vue";
+import { useRouter } from "vue-router";
+import { createTrail } from "../services/trailService";
+
+const router = useRouter();
 
 /* =========================
-   FORM (backend-aligned)
+   ADMIN GUARD
+   ========================= */
+const isAuthorized = ref(false);
+const authError = ref("");
+
+onMounted(() => {
+  const token = localStorage.getItem("token");
+  const userId = localStorage.getItem("userId");
+  const isAdmin = localStorage.getItem("isAdmin");
+
+  if (!token || !userId) {
+    authError.value = "Devi essere loggato.";
+    return;
+  }
+  if (isAdmin !== "true") {
+    authError.value = "Permessi amministratore richiesti.";
+    return;
+  }
+
+  isAuthorized.value = true;
+});
+
+/* =========================
+   FORM DATA
    ========================= */
 const form = ref({
   title: "",
   description: "",
   region: "",
   valley: "",
-
-  difficulty: "Easy", // Easy | Medium | Difficult
-
-  lengthKm: 0, // >= 0
-
-  duration: {
-    hours: 0,    // >= 0
-    minutes: 0  // 0 - 59
-  },
-
-  roadbook: "",
-  directions: "",
-  parking: "",
-
+  difficulty: "Easy",
+  lengthKm: 0,
+  duration: { hours: 0, minutes: 0 }, // verrà stringificato
   ascentM: 0,
   descentM: 0,
   highestPointM: 0,
   lowestPointM: 0,
-
-  tags: [],
-
-  coordinates: {
-    Lat: "", // numero
-    Lon: ""  // numero
-  },
-
-  idAdmin: "" // TODO: auth
+  roadbook: "",
+  directions: "",
+  parking: "",
+  tags: [], // verrà stringificato
+  lat: 0,
+  lon: 0,
+  idAdmin: localStorage.getItem("userId") || ""
 });
 
 /* =========================
    TAG GROUPS
    ========================= */
 const tagGroups = {
-  Percorso: [
-    "linear_route",
-    "round_trip",
-    "out_and_back",
-    "multi_stage_route",
-    "summit_route",
-    "ridge"
-  ],
-  Natura: [
-    "flora",
-    "fauna",
-    "scenic",
-    "geological_highlights"
-  ],
-  Accessibilità: [
-    "family_friendly",
-    "dog_friendly",
-    "accessibility",
-    "suitable_for_strollers"
-  ],
-  Tecnico: [
-    "scrambling_required",
-    "exposed_sections",
-    "secured_passages"
-  ],
-  Servizi: [
-    "refreshment_stops_available",
-    "cableway_ascent_descent",
-    "healthy_climate"
-  ],
-  Extra: [
-    "cultural_historical_interest",
-    "insider_tip"
-  ]
+  Percorso: ["linear_route", "round_trip", "out_and_back"],
+  Natura: ["flora", "fauna", "scenic"],
+  Accessibilità: ["family_friendly", "dog_friendly"],
+  Tecnico: ["scrambling_required", "exposed_sections"],
+  Servizi: ["refreshment_stops_available"],
+  Extra: ["cultural_historical_interest"]
+};
+
+const toggleTag = (tag) => {
+  const idx = form.value.tags.indexOf(tag);
+  idx === -1 ? form.value.tags.push(tag) : form.value.tags.splice(idx, 1);
 };
 
 /* =========================
-   UTILS
+   HELPERS
    ========================= */
-const toggleValue = (list, value) => {
-  const index = list.indexOf(value);
-  if (index === -1) list.push(value);
-  else list.splice(index, 1);
+const isValidObjectId = (id) => {
+  return typeof id === "string" && /^[0-9a-fA-F]{24}$/.test(id);
 };
 
 /* =========================
    SAVE TRACK
+   - serializziamo duration, coordinates, tags come stringhe JSON
+   - idAdmin deve assomigliare a ObjectId
    ========================= */
-const saveTrack = () => {
-  // Controlli minimi lato frontend
-  if (!form.value.title) {
-    alert("Il titolo è obbligatorio");
+const saveTrack = async () => {
+  // obbligatori
+  if (!form.value.title || !form.value.title.trim()) {
+    alert("Il titolo è obbligatorio.");
+    return;
+  }
+  if (form.value.lat === "" || form.value.lon === "") {
+    alert("Latitudine e longitudine sono obbligatorie.");
+    return;
+  }
+  if (!form.value.idAdmin) {
+    alert("idAdmin mancante.");
+    return;
+  }
+  if (!isValidObjectId(form.value.idAdmin)) {
+    alert("idAdmin non ha il formato di un Mongo ObjectId (24 esadecimali). Controlla il valore in localStorage.");
     return;
   }
 
-  if (form.value.duration.minutes < 0 || form.value.duration.minutes > 59) {
-    alert("I minuti devono essere tra 0 e 59");
-    return;
-  }
-
-  if (
-    form.value.coordinates.Lat === "" ||
-    form.value.coordinates.Lon === ""
-  ) {
-    alert("Inserire coordinate valide");
-    return;
-  }
-
-  /* =========================
-     PAYLOAD JSON (POST)
-     =========================
-     Backend si aspetta qualcosa di simile:
-
+  // costruzione payload: NOTA -> duration/coordinates/tags sono STRINGHE JSON
   const payload = {
-    title: form.value.title,
-    description: form.value.description,
-    region: form.value.region,
-    valley: form.value.valley,
-    difficulty: form.value.difficulty,
-    lengthKm: Number(form.value.lengthKm),
-    duration: {
-      hours: Number(form.value.duration.hours),
-      minutes: Number(form.value.duration.minutes)
-    },
-    roadbook: form.value.roadbook,
-    directions: form.value.directions,
-    parking: form.value.parking,
-    ascentM: Number(form.value.ascentM),
-    descentM: Number(form.value.descentM),
-    highestPointM: Number(form.value.highestPointM),
-    lowestPointM: Number(form.value.lowestPointM),
-    tags: form.value.tags,
-    coordinates: {
-      lat: Number(form.value.coordinates.Lat),
-      lon: Number(form.value.coordinates.Lon)
-    },
+    title: String(form.value.title).trim(),
+    description: form.value.description || "",
+    region: form.value.region || "",
+    valley: form.value.valley || "",
+    difficulty: form.value.difficulty || "Easy",
+    lengthKm: form.value.lengthKm === "" ? 0 : Number(form.value.lengthKm),
+
+    // stringifico duration: il backend fa JSON.parse(req.body.duration)
+    duration: JSON.stringify({
+      hours: Number(form.value.duration.hours || 0),
+      minutes: Number(form.value.duration.minutes || 0)
+    }),
+
+    ascentM: form.value.ascentM === "" ? 0 : Number(form.value.ascentM),
+    descentM: form.value.descentM === "" ? 0 : Number(form.value.descentM),
+    highestPointM: form.value.highestPointM === "" ? 0 : Number(form.value.highestPointM),
+    lowestPointM: form.value.lowestPointM === "" ? 0 : Number(form.value.lowestPointM),
+
+    roadbook: form.value.roadbook || "",
+    directions: form.value.directions || "",
+    parking: form.value.parking || "",
+
+    // tags come come stringa, backend farà JSON.parse
+    tags: JSON.stringify(form.value.tags || []),
+
+    // coordinates come come stringa JSON (così il backend può JSON.parse)
+    // manteniamo struttura DD se il backend la usa; usa questa variante:
+    coordinates: JSON.stringify({ DD: { lat: Number(form.value.lat), lon: Number(form.value.lon) } }),
+
     idAdmin: form.value.idAdmin
   };
 
-  axios.post("/trails", payload)
-  */
+  // LOG per debug - copia esatta dell'oggetto che stiamo inviando
+  // ATTENZIONE: alcune proprietà sono stringhe JSON (duration, tags, coordinates)
+  console.log("Payload da inviare:", payload);
 
-  console.log("Payload pronto per POST:", JSON.stringify(form.value, null, 2));
+  try {
+    // createTrail in trailService è: api.post("/trails", formDataOrObject)
+    // qui inviamo un JSON (object con stringhe annidate) - il backend farà JSON.parse sui campi attesi
+    await createTrail(payload);
+    router.back();
+  } catch (err) {
+    // stampa dettagliata per debugging
+    console.error("Errore createTrail:", err.response?.data || err.message || err);
+    alert("Errore durante la creazione del sentiero. Controlla la console per dettagli.");
+  }
 };
 </script>
 
 <template>
-  <div class="new-track-page">
+  <div>
+    <div v-if="authError" class="auth-error">
+      <h2>⛔ Accesso negato</h2>
+      <p>{{ authError }}</p>
+      <router-link to="/" class="back-btn">Torna alla Home</router-link>
+    </div>
 
-    <!-- HEADER -->
-    <header class="header">
-      <div class="header-left">
+    <div v-else-if="!isAuthorized">
+      <p>Verifica permessi…</p>
+    </div>
+
+    <div v-else class="new-track-page">
+      <header class="header">
         <router-link to="/statistics" class="nav-btn">Statistiche</router-link>
-      </div>
-
-      <div class="header-center">
-        <img src="../assets/goon_logo.png" class="logo" alt="GO-ON Logo" />
-      </div>
-
-      <div class="header-right">
+        <img src="../assets/goon_logo.png" class="logo" />
         <router-link to="/" class="nav-btn">Home</router-link>
         <router-link to="/profile" class="nav-btn">Profilo</router-link>
-      </div>
-    </header>
+      </header>
 
-    <!-- BODY -->
-    <main class="form-body">
-
-      <!-- LEFT COLUMN -->
-      <section class="column">
-        <div class="field">
-          <label>Nome *</label>
+      <main class="form-body">
+        <section class="column">
+          <label>Titolo *</label>
           <input v-model="form.title" />
-        </div>
 
-        <div class="field">
-          <label>Descrizione breve</label>
+          <label>Descrizione</label>
           <textarea v-model="form.description" />
-        </div>
 
-        <div class="row">
-          <div class="field">
-            <label>Regione</label>
-            <input v-model="form.region" />
+          <label>Regione</label>
+          <input v-model="form.region" />
+
+          <label>Valle</label>
+          <input v-model="form.valley" />
+
+          <label>Lunghezza (km)</label>
+          <input type="number" v-model.number="form.lengthKm" />
+          <label>Difficoltà</label>
+          <select v-model="form.difficulty">
+            <option>Easy</option>
+            <option>Medium</option>
+            <option>Difficult</option>
+          </select>
+  
+          <label>Durata</label>
+          <div class="inline">
+            <input type="number" placeholder="Ore" v-model.number="form.duration.hours" />
+            <input type="number" placeholder="Minuti" v-model.number="form.duration.minutes" />
           </div>
+        </section>
 
-          <div class="field">
-            <label>Valle</label>
-            <input v-model="form.valley" />
-          </div>
-        </div>
+        <section class="column">
 
-        <div class="row">
-          <div class="field">
-            <label>Lunghezza (km)</label>
-            <input type="number" min="0" step="0.1" v-model="form.lengthKm" />
-          </div>
+          <label>Dislivello +</label>
+          <input type="number" v-model.number="form.ascentM" />
 
-          <div class="field">
-            <label>Difficoltà</label>
-            <select v-model="form.difficulty">
-              <option>Easy</option>
-              <option>Medium</option>
-              <option>Difficult</option>
-            </select>
-          </div>
-        </div>
+          <label>Dislivello -</label>
+          <input type="number" v-model.number="form.descentM" />
+          <label>Punto più alto (m)</label>
+          <input type="number" v-model.number="form.highestPointM" />
 
-        <div class="row">
-          <div class="field">
-            <label>Ore</label>
-            <input type="number" min="0" v-model="form.duration.hours" />
-          </div>
+          <label>Punto più basso (m)</label>
+          <input type="number" v-model.number="form.lowestPointM" />
 
-          <div class="field">
-            <label>Minuti</label>
-            <input type="number" min="0" max="59" v-model="form.duration.minutes" />
-          </div>
-        </div>
-
-        <div class="field">
           <label>Roadbook</label>
           <textarea v-model="form.roadbook" />
-        </div>
 
-        <div class="field">
           <label>Indicazioni</label>
           <textarea v-model="form.directions" />
-        </div>
 
-
-      </section>
-
-      <!-- RIGHT COLUMN -->
-      <section class="column">
-        <div class="field">
           <label>Parcheggio</label>
           <input v-model="form.parking" />
-        </div>
-        <div class="row">
-          <div class="field">
-            <label>Salita (m)</label>
-            <input type="number" min="0" v-model="form.ascentM" />
-          </div>
 
-          <div class="field">
-            <label>Discesa (m)</label>
-            <input type="number" min="0" v-model="form.descentM" />
-          </div>
-        </div>
+          <label>Latitudine *</label>
+          <input type="number" v-model.number="form.lat" step="0.000001" />
 
-        <div class="row">
-          <div class="field">
-            <label>Quota max (m)</label>
-            <input type="number" v-model="form.highestPointM" />
-          </div>
+          <label>Longitudine *</label>
+          <input type="number" v-model.number="form.lon" step="0.000001" />
+        </section>
 
-          <div class="field">
-            <label>Quota min (m)</label>
-            <input type="number" v-model="form.lowestPointM" />
-          </div>
-        </div>
-
-        <!-- TAGS -->
-        <div class="field">
-          <div
-            v-for="(tags, groupName) in tagGroups"
-            :key="groupName"
-            class="tag-group"
-          >
-            <span class="tag-title">{{ groupName }}</span>
-
-            <div class="buttons">
+        <section class="column">
+          <label>Tag</label>
+          <div v-for="(tags, group) in tagGroups" :key="group">
+            <strong>{{ group }}</strong>
+            <div class="tag-row">
               <button
                 v-for="tag in tags"
                 :key="tag"
                 type="button"
-                @click="toggleValue(form.tags, tag)"
+                class="tag-btn"
                 :class="{ active: form.tags.includes(tag) }"
+                @click="toggleTag(tag)"
               >
-                {{ tag.replaceAll('_', ' ') }}
+                {{ tag }}
               </button>
             </div>
           </div>
-        </div>
 
-        <div class="field">
-          <label>Coordinate (centro mappa) *</label>
-          <input type="number" step="0.000001" placeholder="Latitudine" v-model="form.coordinates.Lat" />
-          <input type="number" step="0.000001" placeholder="Longitudine" v-model="form.coordinates.Lon" />
-        </div>
+          <div style="margin-top:16px">
+            <button class="save-btn" @click="saveTrack">Salva sentiero</button>
+          </div>
 
-        <button class="save-btn" @click="saveTrack">
-          Salva
-        </button>
-      </section>
-
-    </main>
+          <p style="margin-top:12px; font-size:0.9rem; color:#666">
+            Nota: Se dovrai caricare anche un file GPX, dovremo adattare il form per inviare FormData (multipart/form-data).
+          </p>
+        </section>
+      </main>
+    </div>
   </div>
 </template>
 
 <style scoped>
-/* invariato, solo estetica */
-</style>
-
-
-<style scoped>
-.new-track-page {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.header {
-  height: 80px;
-  display: grid;
-  grid-template-columns: 1fr auto 1fr;
-  align-items: center;
-  padding: 0 24px;
-  border-bottom: 1px solid #ddd;
-}
-
-.logo {
-  height: 50px;
-}
-
-.header-left,
-.header-right {
-  display: flex;
-  gap: 12px;
-}
-
-.nav-btn {
-  text-decoration: none;
-  padding: 6px 12px;
-  background: #2c7be5;
-  color: white;
-  border-radius: 6px;
-}
-
-.form-body {
-  flex: 1;
-  display: flex;
-  padding: 24px;
-  gap: 24px;
-}
-
-.column {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.field label {
-  font-weight: bold;
-}
-
-.field input,
-.field textarea,
-.field select {
-  width: 100%;
-  padding: 6px;
-}
-
-textarea {
-  min-height: 80px;
-}
-
-.row {
-  display: flex;
-  gap: 12px;
-}
-
-.row > .field {
-  flex: 1;
-  min-width: 0;
-}
-
-.tag-group {
-  margin-bottom: 8px;
-}
-
-.tag-title {
-  font-weight: bold;
-  font-size: 0.9rem;
-}
-
-.buttons {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.buttons button {
-  padding: 6px 10px;
-  border: 1px solid #aaa;
-  background: #f5f5f5;
-  cursor: pointer;
-  border-radius: 6px;
-}
-
-.buttons button.active {
-  background: #2c7be5;
-  color: white;
-  border-color: #2c7be5;
-}
-
-.save-btn {
-  margin-top: 16px;
-  width: 120px;
-  padding: 10px;
-  background: #2c7be5;
-  align-self: flex-end;
-  color: white;
-  border: none;
-  cursor: pointer;
-}
+.new-track-page { height: 100vh; display:flex; flex-direction:column; }
+.header { height:80px; display:flex; justify-content:space-between; align-items:center; padding:0 24px; border-bottom:1px solid #ddd; }
+.logo { height:50px }
+.form-body { flex:1; display:flex; gap:24px; padding:24px; }
+.column { flex:1; display:flex; flex-direction:column; gap:8px; }
+.inline { display:flex; gap:8px; }
+.nav-btn { background:#2c7be5; color:white; padding:6px 12px; border-radius:6px; text-decoration:none; }
+.save-btn { margin-top:8px; background:#2c7be5; color:white; padding:10px 14px; border:none; cursor:pointer; }
+.tag-row { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px }
+.tag-btn { border:1px solid #aaa; background:#f5f5f5; padding:4px 8px; cursor:pointer }
+.tag-btn.active { background:#2c7be5; color:white; border-color:#2c7be5 }
+.auth-error { height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center }
+.back-btn { margin-top:16px; padding:8px 16px; background:#2c7be5; color:white; text-decoration:none; border-radius:6px }
 </style>

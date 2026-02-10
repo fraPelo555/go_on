@@ -1,51 +1,61 @@
 <script setup>
-  import { ref, watch, onMounted } from "vue";
-  import { useRoute, useRouter } from "vue-router";
-  import TrailMap from "../components/TrailMap.vue";
-  import { getTrails } from "../services/trailService";
+import { ref, watch, onMounted } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import TrailMap from "../components/TrailMap.vue";
+import { getUserById } from "../services/userService";
+import { getTrails, deleteTrail, updateTrail } from "../services/trailService";
+import { addFavourite } from "../services/userService";
 
-  /* ROUTER */
-  const route = useRoute();
-  const router = useRouter();
+/* =========================
+   ROUTER
+   ========================= */
+const route = useRoute();
+const router = useRouter();
 
-  /* STATE */
-  const trails = ref([]);
-  const visibleTrails = ref([]);
-  const showAdvanced = ref(false);
-  const selectedTags = ref([]);
+/* =========================
+   STATE
+   ========================= */
+const trails = ref([]);
+const visibleTrails = ref([]);
+const showAdvanced = ref(false);
+const selectedTags = ref([]);
 
-  /* AUTH STATE */
-  const isLogged = ref(false);
-  const userId = ref(null);
-  const isAdmin = ref(false);
+/* =========================
+   AUTH STATE (simulato)
+   ========================= */
+const isLogged = ref(false);
+const userId = ref(null);
+const isAdmin = ref(false);
+const username = ref("");
+username.value = localStorage.getItem("username") || "";
 
-  const checkAuth = () => {
-    const token = localStorage.getItem("token");
-  
-    if (token) {
-      isLogged.value = true;
-      userId.value = localStorage.getItem("userId");
-      isAdmin.value = localStorage.getItem("isAdmin") === "true";
-    } else {
-      isLogged.value = false;
-      userId.value = null;
-      isAdmin.value = false;
-    }
-  };
+const checkAuth = async () => {
+  const token = localStorage.getItem("token");
 
-  onMounted(() => {
-    checkAuth();
-  });
+  if (token) {
+    isLogged.value = true;
+    userId.value = localStorage.getItem("userId");
+    isAdmin.value = localStorage.getItem("isAdmin") === "true";
 
-  /* TAG DINAMICI */
-  const tagGroups = ref({});
+  } else {
+    isLogged.value = false;
+    userId.value = null;
+    isAdmin.value = false;
+  }
+};
 
-  /* FETCH TAGS (DERIVATI) */
-  const fetchTags = (trailList) => {
-    const allTags = new Set();
-  
-    trailList.forEach(trail => {
-      (trail.tags || []).forEach(tag => allTags.add(tag));
+onMounted(checkAuth);
+
+/* =========================
+   TAG DINAMICI
+   ========================= */
+const tagGroups = ref({});
+
+const fetchTags = (trailList) => {
+  const allTags = new Set();
+
+  trailList.forEach(trail => {
+    (trail.tags || []).forEach(tag => allTags.add(tag));
   });
 
   const tags = Array.from(allTags);
@@ -69,106 +79,160 @@
     Extra: tags.filter(t =>
       ["cultural_historical_interest", "insider_tip"].includes(t)
     )
-   };
   };
+};
 
-  /* FETCH TRAILS */
-  const fetchTrails = async () => {
-    try {
-      const response = await getTrails(route.query);
+/* =========================
+   FETCH TRAILS
+   ========================= */
+const fetchTrails = async () => {
+  try {
+    const { data } = await getTrails(route.query);
 
-      trails.value = response.data.map(trail => ({
-        id: trail._id,
-        title: trail.title,
-        description: trail.description || "Nessuna descrizione",
-        region: trail.region,
-        valley: trail.valley,
-        difficulty: trail.difficulty,
-        lengthKm: trail.lengthKm,
-        lengthLabel: `${trail.lengthKm} km`,
-        duration: trail.duration,
-        durationLabel: `${trail.duration.hours}h ${trail.duration.minutes}m`,
-        ascentM: trail.ascentM,
-        descentM: trail.descentM,
-        highestPointM: trail.highestPointM,
-        lowestPointM: trail.lowestPointM,
-        roadbook: trail.roadbook,
-        directions: trail.directions,
-        parking: trail.parking,
-        tags: trail.tags || [],
-        coordinates: trail.coordinates,
-        location: trail.location?.coordinates
-          ? { lon: trail.location.coordinates[0], lat: trail.location.coordinates[1] }
-          : null
-      }));
-     
-      visibleTrails.value = trails.value;
+    trails.value = data.map(trail => ({
+      id: trail.id, // ASSUMENDO CHE IL BACKEND RITORNI "id" E NON "_id"
+      title: trail.title,
+      description: trail.description || "Nessuna descrizione",
+      difficulty: trail.difficulty,
+      lengthLabel: `${trail.lengthKm} km`,
+      durationLabel: `${trail.duration?.hours || 0}h ${trail.duration?.minutes || 0}m`,
+      tags: trail.tags || [],
+      location: trail.location?.coordinates
+        ? { lon: trail.location.coordinates[0], lat: trail.location.coordinates[1] }
+        : null
+    }));
 
-    /* 👇 TAG DINAMICI */
+    visibleTrails.value = trails.value;
     fetchTags(trails.value);
 
-    } catch (err) {
-      console.error("Errore fetching trails:", err);
-    }
-  };
+  } catch (err) {
+    console.error("Errore fetching trails:", err);
+  }
+};
 
-  /* WATCH QUERY */
-  watch(
-    () => route.query,
-    fetchTrails,
-    { immediate: true }
-  );
+watch(() => route.query, fetchTrails, { immediate: true });
 
-  /* TAG HANDLER */
-  const toggleTag = (tag) => {
-    if (selectedTags.value.includes(tag)) {
-      selectedTags.value = selectedTags.value.filter(t => t !== tag);
-    } else {
-      selectedTags.value.push(tag);
-    }
-    updateFilter("tags", selectedTags.value.join(","));
-  };
+/* =========================
+   FILTER HANDLERS
+   ========================= */
+const toggleTag = (tag) => {
+  selectedTags.value.includes(tag)
+    ? selectedTags.value = selectedTags.value.filter(t => t !== tag)
+    : selectedTags.value.push(tag);
 
-  /* UPDATE FILTER */
-  const updateFilter = (key, value) => {
-    const query = { ...route.query };
-    if (!value || value.length === 0) delete query[key];
-    else query[key] = value;
-    router.replace({ query });
-  };
+  updateFilter("tags", selectedTags.value.join(","));
+};
+
+const updateFilter = (key, value) => {
+  const query = { ...route.query };
+  if (!value) delete query[key];
+  else query[key] = value;
+  router.replace({ query });
+};
+
+/* =========================
+   USER ACTIONS
+   ========================= */
+const handleAddFavourite = async (trailId) => {
+  if (!isLogged.value) return;
+
+  try {
+    await addFavourite(userId.value, trailId);
+    alert("Aggiunto ai preferiti");
+  } catch (err) {
+    console.error("Errore preferiti:", err);
+  }
+};
+
+const handleDeleteTrail = async (trailId) => {
+  if (!isAdmin.value) return;
+
+  if (!confirm("Sei sicuro di voler eliminare il sentiero?")) return;
+
+  try {
+    await deleteTrail(trailId);
+    fetchTrails();
+  } catch (err) {
+    console.error("Errore eliminazione:", err);
+  }
+};
+
+const handleEditTrail = (trailId) => {
+  router.push(`/tracks/edit/${trailId}`);
+};
+
+/* =========================
+   PLACEHOLDER
+   ========================= */
+const handleSearch = () => {};
+const enableGeolocation = () => {};
 </script>
-
 
 <template>
   <div class="homepage">
 
-    <!-- HEADER -->
+    <!-- ================= HEADER ================= -->
     <header class="header">
-      <div></div>
+
+      <!-- LEFT -->
+      <div class="header-left">
+        <router-link
+          v-if="isAdmin"
+          to="/new-track"
+          class="login-btn"
+        >
+          NewTrack
+        </router-link>
+
+        <router-link
+          v-if="isAdmin"
+          to="/statistics"
+          class="login-btn"
+        >
+          Statistics
+        </router-link>
+      </div>
+
+      <!-- CENTER -->
       <div class="header-center">
         <img src="../assets/goon_logo.png" class="logo" />
       </div>
+
+      <!-- RIGHT -->
       <div class="header-right">
-      
-        <router-link v-if="!isLogged" to="/login" class="login-btn" >
+       <router-link
+          v-if="isAdmin"
+          to="/admin"
+          class="login-btn"
+        >
+          AdminInfo
+        </router-link> 
+       <div v-if="isLogged" class="user-info">
+         <span class="username-box">
+           👤 {{ username }}
+         </span>
+       </div>
+       <router-link
+          v-if="!isLogged"
+          to="/login"
+          class="login-btn"
+        >
           Login
         </router-link>
-       
-        <div v-else class="user-box">
-          <span class="user-id">
-            {{ userId }}
-          </span>
-         
-          <router-link to="/profile" class="login-btn" >
+
+        <router-link
+          v-else
+          to="/profile"
+          class="login-btn"
+        >
           Profile
         </router-link>
-        </div>
-       
+
       </div>
 
     </header>
 
-    <!-- BODY -->
+    <!-- ================= BODY ================= -->
     <main class="main-content">
 
       <!-- MAP -->
@@ -216,22 +280,6 @@
           </div>
 
           <div class="filter-row">
-            <label>Length (km)</label>
-            <div class="range">
-              <input type="number" placeholder="Min" @input="e => updateFilter('minLength', e.target.value)" />
-              <input type="number" placeholder="Max" @input="e => updateFilter('maxLength', e.target.value)" />
-            </div>
-          </div>
-
-          <div class="filter-row">
-            <label>Duration (minutes)</label>
-            <div class="range">
-              <input type="number" placeholder="Min" @input="e => updateFilter('minDuration', e.target.value)" />
-              <input type="number" placeholder="Max" @input="e => updateFilter('maxDuration', e.target.value)" />
-            </div>
-          </div>
-
-          <div class="filter-row">
             <label>Tags</label>
 
             <div
@@ -247,7 +295,7 @@
                   :class="{ active: selectedTags.includes(tag) }"
                   @click="toggleTag(tag)"
                 >
-                  {{ tag.replaceAll("_", " ") }}
+                  {{ tag.replaceAll('_', ' ') }}
                 </button>
               </div>
             </div>
@@ -256,20 +304,45 @@
 
         <!-- RESULTS -->
         <div class="results">
-          <router-link
+          <div
             v-for="trail in visibleTrails"
             :key="trail.id"
-            :to="`/tracks/${trail.id}`"
             class="trail-card"
           >
-            <h4>{{ trail.title }}</h4>
-            <p>{{ trail.description }}</p>
-            <div class="trail-meta">
-              <span>{{ trail.lengthLabel }}</span>
-              <span>{{ trail.durationLabel }}</span>
-              <span>{{ trail.difficulty }}</span>
+            <router-link :to="`/tracks/${trail.id}`">
+              <h4>{{ trail.title }}</h4>
+              <p>{{ trail.description }}</p>
+              <div class="trail-meta">
+                <span>{{ trail.lengthLabel }}</span>
+                <span>{{ trail.durationLabel }}</span>
+                <span>{{ trail.difficulty }}</span>
+              </div>
+            </router-link>
+
+            <!-- ACTIONS -->
+            <div class="trail-actions">
+              <button
+                v-if="isLogged"
+                @click="handleAddFavourite(trail.id)"
+              >
+                ⭐
+              </button>
+
+              <button
+                v-if="isAdmin"
+                @click="handleEditTrail(trail.id)"
+              >
+                ✏️
+              </button>
+
+              <button
+                v-if="isAdmin"
+                @click="handleDeleteTrail(trail.id)"
+              >
+                🗑️
+              </button>
             </div>
-          </router-link>
+          </div>
         </div>
 
       </aside>
@@ -300,6 +373,7 @@
 
 .header-right {
   display: flex;
+  gap: 12px;
   justify-content: flex-end;
 }
 
@@ -411,5 +485,14 @@
   gap: 12px;
 }
 
+.header-left {
+  display: flex;
+  gap: 12px;
+}
 
+.trail-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
 </style>

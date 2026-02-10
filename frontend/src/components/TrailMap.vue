@@ -5,11 +5,17 @@ import "leaflet/dist/leaflet.css";
 import "leaflet-gpx";
 
 const props = defineProps({
+  markers: {
+    type: Array,
+    default: () => []
+  },
   gpx: {
     type: String,
-    required: true
+    required: false,   // 🔴 NON obbligatorio
+    default: null
   }
 });
+
 
 const mapContainer = ref(null);
 let map = null;

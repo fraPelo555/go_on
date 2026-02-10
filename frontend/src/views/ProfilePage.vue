@@ -1,32 +1,44 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
+
 import {
   getUserById,
   updateUser,
-  deleteUser
+  deleteUser,
+  getFavourites
 } from "../services/userService";
 
-/* ROUTER */
+import { getUserFeedbacks } from "../services/feedbackService";
+import { getUserReports } from "../services/reportService";
+
+/* ======================
+   ROUTER & AUTH
+   ====================== */
 const router = useRouter();
-
-/* AUTH */
 const userId = localStorage.getItem("userId");
-if (!userId) router.push("/login");
 
-/* STATE */
+if (!userId) {
+  router.push("/login");
+}
+
+/* ======================
+   STATE
+   ====================== */
 const user = ref(null);
+const favourites = ref([]);
+const feedbacks = ref([]);
+const reports = ref([]);
+
 const editMode = ref(false);
+const showPassword = ref(false);
 
 const form = ref({
   username: "",
-  email: "",
-  newPassword: "",
+  email: "", // SOLO READ-ONLY
   currentPassword: "",
-  avatar: null
+  newPassword: ""
 });
-
-const showPassword = ref(false);
 
 /* ======================
    FETCH USER
@@ -34,16 +46,41 @@ const showPassword = ref(false);
 const fetchUser = async () => {
   try {
     const res = await getUserById(userId);
-    user.value = res.data;
 
-    form.value.username = user.value.username;
-    form.value.email = user.value.email;
+    // 👉 supporta sia res.data che res.data.user
+    const userData = res.data.user || res.data;
+
+    user.value = userData;
+
+    form.value.username = userData.username || "";
+    form.value.email = userData.email || "";
+    form.value.currentPassword = "";
+    form.value.newPassword = "";
   } catch (err) {
-    console.error("Errore fetch user", err);
+    console.error("Errore fetch user:", err);
   }
 };
 
-onMounted(fetchUser);
+const fetchExtras = async () => {
+  try {
+    const [favRes, fbRes, repRes] = await Promise.all([
+      getFavourites(userId),
+      getUserFeedbacks(userId),
+      getUserReports(userId)
+    ]);
+
+    favourites.value = favRes.data || [];
+    feedbacks.value = fbRes.data || [];
+    reports.value = repRes.data || [];
+  } catch (err) {
+    console.error("Errore fetch dati utente:", err);
+  }
+};
+
+onMounted(async () => {
+  await fetchUser();
+  await fetchExtras();
+});
 
 /* ======================
    LOGOUT
@@ -56,8 +93,13 @@ const logout = () => {
 /* ======================
    EDIT PROFILE
    ====================== */
-const editProfile = () => {
+const toggleEdit = () => {
   editMode.value = !editMode.value;
+
+  if (!editMode.value) {
+    form.value.currentPassword = "";
+    form.value.newPassword = "";
+  }
 };
 
 /* ======================
@@ -65,26 +107,27 @@ const editProfile = () => {
    ====================== */
 const saveProfile = async () => {
   try {
-    if (form.value.newPassword && !form.value.currentPassword) {
-      alert("Inserisci la password attuale");
-      return;
-    }
-
     const payload = {
-      username: form.value.username,
-      email: form.value.email,
+      username: form.value.username
     };
 
     if (form.value.newPassword) {
+      if (!form.value.currentPassword) {
+        alert("Inserisci la password attuale");
+        return;
+      }
+
       payload.password = form.value.newPassword;
       payload.currentPassword = form.value.currentPassword;
     }
 
     await updateUser(userId, payload);
+
     editMode.value = false;
-    fetchUser();
+    await fetchUser();
   } catch (err) {
-    alert("Errore aggiornamento profilo");
+    console.error(err);
+    alert("Errore durante il salvataggio del profilo");
   }
 };
 
@@ -92,7 +135,7 @@ const saveProfile = async () => {
    DELETE PROFILE
    ====================== */
 const deleteProfileConfirm = async () => {
-  if (!confirm("Sei sicuro di voler eliminare il profilo?")) return;
+  if (!confirm("Sei sicuro di voler eliminare definitivamente il profilo?")) return;
 
   try {
     await deleteUser(userId);
@@ -104,13 +147,12 @@ const deleteProfileConfirm = async () => {
 };
 
 /* ======================
-   PASSWORD TOGGLE
+   UTILS
    ====================== */
 const togglePassword = () => {
   showPassword.value = !showPassword.value;
 };
 </script>
-
 
 <template>
   <div class="profile-page">
@@ -129,114 +171,109 @@ const togglePassword = () => {
     <!-- BODY -->
     <main class="content">
 
-      <!-- LEFT COLUMN -->
+      <!-- LEFT -->
       <aside class="left-column">
-        <div class="avatar">
-          <!-- Futuro upload avatar -->
-        </div>
+        <div class="avatar"></div>
 
         <div class="actions">
           <button @click="logout">Log Out</button>
-          <button @click="editProfile">
+          <button @click="toggleEdit">
             {{ editMode ? "Annulla" : "Modifica Profilo" }}
           </button>
-          <button v-if="editMode" @click="saveProfile">Salva Modifiche</button>
-          <button @click="deleteProfileConfirm" class="danger">Elimina Profilo</button>
-          <button @click="exportData">Esporta Dati</button>
-          <button @click="manageCookies">Cambia Gestione Cookie</button>
+          <button v-if="editMode" @click="saveProfile">
+            Salva Modifiche
+          </button>
+          <button class="danger" @click="deleteProfileConfirm">
+            Elimina Profilo
+          </button>
         </div>
       </aside>
 
-      <!-- CENTER COLUMN -->
+      <!-- CENTER -->
       <section class="center-column">
 
-        <!-- USER INFO TABLE -->
+        <!-- USER INFO -->
         <table class="info-table">
           <tbody>
             <tr>
               <td>Username</td>
               <td>
-                <input type="text" v-model="form.username" :disabled="!editMode" />
+                <input
+                  v-model="form.username"
+                  :disabled="!editMode"
+                />
               </td>
             </tr>
 
             <tr>
               <td>Email</td>
               <td>
-                <input type="email" v-model="form.email" :disabled="!editMode" />
+                <input
+                  type="email"
+                  v-model="form.email"
+                  disabled
+                />
               </td>
             </tr>
 
-            <tr>
+            <tr v-if="editMode">
               <td>Password</td>
               <td class="password-cell">
                 <input
                   :type="showPassword ? 'text' : 'password'"
                   v-model="form.currentPassword"
-                  :disabled="!editMode"
                   placeholder="Password attuale"
                 />
                 <input
                   :type="showPassword ? 'text' : 'password'"
                   v-model="form.newPassword"
-                  :disabled="!editMode"
                   placeholder="Nuova password"
                 />
-                <button @click="togglePassword">👁</button>
-              </td>
-            </tr>
-
-            <tr>
-              <td>Avatar</td>
-              <td>
-                <input type="file" :disabled="!editMode" @change="e => form.avatar = e.target.files[0]" />
+                <button type="button" @click="togglePassword">👁</button>
               </td>
             </tr>
           </tbody>
         </table>
 
-        <!-- LOWER SECTION: HISTORY -->
+        <!-- HISTORY -->
         <div class="history-section">
 
           <div class="history-box">
-            <h3>Storico Recensioni</h3>
-            <div class="scroll-pane">
-              <div class="history-content">
-                <div
-                  v-for="(entry, idx) in user?.feedbacks || []"
-                  :key="idx"
-                  class="history-entry"
-                >
-                  {{ entry }}
-                </div>
+            <h3>Recensioni</h3>
+            <div class="history-scroll">
+              <div
+                v-for="fb in feedbacks"
+                :key="fb._id"
+                class="history-entry"
+              >
+                ⭐ {{ fb.rating }} – {{ fb.text || "Nessun commento" }}
               </div>
             </div>
           </div>
 
           <div class="history-box">
-            <h3>Storico Segnalazioni</h3>
-            <div class="scroll-pane">
-              <div class="history-content">
-                <div
-                  v-for="(entry, idx) in user?.reports || []"
-                  :key="idx"
-                  class="history-entry"
-                >
-                  {{ entry }}
-                </div>
+            <h3>Segnalazioni</h3>
+            <div class="history-scroll">
+              <div
+                v-for="rep in reports"
+                :key="rep._id"
+                class="history-entry"
+              >
+                🚩 {{ rep.reason || "Segnalazione" }}
               </div>
             </div>
           </div>
 
         </div>
-
       </section>
 
-      <!-- RIGHT COLUMN -->
+      <!-- RIGHT -->
       <aside class="right-column">
-        <h3>Ultime 10 Ricerche</h3>
+        <h3>Preferiti</h3>
         <ul class="search-list">
-          <li v-for="(search, idx) in user?.recentSearches || []" :key="idx">{{ search }}</li>
+          <li v-for="trail in favourites" :key="trail._id">
+            {{ trail.title || "Sentiero" }}
+          </li>
         </ul>
       </aside>
 
@@ -244,8 +281,7 @@ const togglePassword = () => {
   </div>
 </template>
 
-
-<style>
+<style scoped>
 .profile-page {
   height: 100vh;
   display: flex;
@@ -255,7 +291,6 @@ const togglePassword = () => {
 /* HEADER */
 .header {
   height: 80px;
-  min-height: 80px; /* assicura altezza minima */
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
@@ -272,8 +307,12 @@ const togglePassword = () => {
   justify-content: flex-end;
 }
 
-.nav-btn {
-  padding: 8px 14px;
+.home-btn {
+  padding: 8px 16px;
+  border-radius: 6px;
+  background: #2c7be5;
+  color: white;
+  text-decoration: none;
 }
 
 /* BODY */
@@ -311,6 +350,10 @@ const togglePassword = () => {
   border: none;
   cursor: pointer;
   text-align: left;
+}
+
+.actions .danger {
+  color: red;
 }
 
 /* CENTER */
@@ -368,14 +411,6 @@ const togglePassword = () => {
 .right-column {
   border-left: 1px solid #ddd;
   padding-left: 12px;
-}
-
-.home-btn {
-  padding: 8px 16px;
-  border-radius: 6px;
-  background-color: #2c7be5;
-  color: white;
-  text-decoration: none;
 }
 
 .search-list {
