@@ -70,7 +70,8 @@ API:
     DELETE	                "/trails/{id}"	                                Eliminare un trail [Autenticazione+Admin]
     GET	                    "/trails/near"	                                Trovare tutti i trail entro un raggio da un punto geografico scelto
     GET	                    "/trails/{id}"	                                Ottenere un trail tramite ID
-    GET	                    "/trails/{id}/gpx"	                            Fare il download file GPX di un trail
+    GET	                    "/trails/{id}/download/gpx"                     Fare il download file GPX di un trail
+    GET	                    "/trails/{id}/gpx"                              Ottenere il file GPX di un trail per visualizzarlo su una mappa
 
 - Reports       
     POST	                "/reports/{idTrail}"	                        Crea un nuovo report [Autenticazione]
@@ -109,9 +110,3 @@ API:
 Per avviare il progetto: 
 1. npm install
 2. npm run dev
-
-DA FARE FRONTEND:
-- Pagina Home
-- Pagina Login
-- Pagina Admin
-- Creare cheda descrittiva per un trail

@@ -741,7 +741,7 @@ describe("GET /trails/:id", () => {
   });
 });
 
-describe("GET /trails/:id/gpx", () => {
+describe("GET /trails/:id/download/gpx", () => {
   let existingTrail;
   let token;
   const gpxFixturePath = path.join(__dirname, "fixtures", "test1.gpx");
@@ -760,7 +760,7 @@ describe("GET /trails/:id/gpx", () => {
 
   it("scarica correttamente il file GPX", async () => {
     const res = await request(app)
-      .get(`/trails/${existingTrail.id}/gpx`)
+      .get(`/trails/${existingTrail.id}/download/gpx`)
       .buffer() 
       .parse((res, callback) => {
         let data = [];
@@ -782,7 +782,7 @@ describe("GET /trails/:id/gpx", () => {
   });
 
   it("ritorna 404 se il trail non esiste", async () => {
-    const res = await request(app).get(`/trails/000000000000000000000000/gpx`);
+    const res = await request(app).get(`/trails/000000000000000000000000/download/gpx`);
 
     expect(res.status).toBe(404);
     expect(res.body.error).toBe("Trail not found");
@@ -791,9 +791,109 @@ describe("GET /trails/:id/gpx", () => {
   it("ritorna 404 se il file GPX non esiste", async () => {
     const trailWithoutGpx = await createTrail({ title: "Trail senza GPX" });
 
-    const res = await request(app).get(`/trails/${trailWithoutGpx.id}/gpx`);
+    const res = await request(app).get(`/trails/${trailWithoutGpx.id}/download/gpx`);
 
     expect(res.status).toBe(404);
     expect(res.body.error).toBe("GPX file not found");
+  });
+});
+
+describe("GET /trails/:id/gpx", () => {
+  let existingTrail;
+  const gpxFixturePath = path.join(__dirname, "fixtures", "test1.gpx");
+
+  beforeEach(async () => {
+    existingTrail = await createTrail({ title: "Trail GPX STREAM" });
+
+    const token = getToken(admin);
+
+    const res = await request(app)
+      .put(`/trails/${existingTrail.id}/gpx`)
+      .set("Authorization", `Bearer ${token}`)
+      .attach("gpx", gpxFixturePath);
+
+    expect(res.status).toBe(200);
+  });
+
+  it("ritorna 200 e streamma correttamente il file GPX", async () => {
+    const res = await request(app)
+      .get(`/trails/${existingTrail.id}/gpx`)
+      .buffer()
+      .parse((res, callback) => {
+        let data = [];
+        res.on("data", (chunk) => data.push(chunk));
+        res.on("end", () => callback(null, Buffer.concat(data)));
+      });
+
+    expect(res.status).toBe(200);
+    expect(res.header["content-type"]).toMatch(/application\/gpx\+xml/);
+    expect(res.header["content-disposition"]).toMatch(/inline/);
+    expect(res.header["content-disposition"]).toMatch(/track\.gpx/);
+
+    expect(res.body.length).toBeGreaterThan(0);
+
+    const fixtureContent = fs.readFileSync(gpxFixturePath, "utf8");
+    expect(res.body.toString()).toBe(fixtureContent);
+  });
+
+  it("ritorna 400 se l'id non è un ObjectId valido", async () => {
+    const res = await request(app).get("/trails/invalid-id/gpx");
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({
+      error: "Invalid trail id",
+    });
+  });
+
+  it("ritorna 404 se il trail non esiste", async () => {
+    const res = await request(app).get(
+      "/trails/000000000000000000000000/gpx"
+    );
+
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({
+      error: "Trail not found",
+    });
+  });
+
+  it("ritorna 404 se il file GPX non esiste", async () => {
+    const trailWithoutGpx = await createTrail({
+      title: "Trail senza file",
+    });
+
+    const res = await request(app).get(
+      `/trails/${trailWithoutGpx.id}/gpx`
+    );
+
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({
+      error: "GPX file not found",
+    });
+  });
+
+  it("propaga errore se lo stream genera un errore", async () => {
+    const savedPath = path.join(
+      uploadDir,
+      existingTrail.id,
+      "track.gpx"
+    );
+
+    const originalCreateReadStream = fs.createReadStream;
+
+    jest.spyOn(fs, "createReadStream").mockImplementationOnce(() => {
+      const stream = originalCreateReadStream(savedPath);
+      process.nextTick(() => {
+        stream.emit("error", new Error("Stream error"));
+      });
+      return stream;
+    });
+
+    const res = await request(app).get(
+      `/trails/${existingTrail.id}/gpx`
+    );
+
+    expect(res.status).toBe(500);
+
+    fs.createReadStream.mockRestore();
   });
 });
