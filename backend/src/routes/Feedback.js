@@ -57,7 +57,15 @@ router.get("/:id", tokenChecker, async (req, res) => {
       return res.status(400).json({ message: "Invalid feedback id" });
     }
 
-    const feedback = await Feedback.findById(req.params.id);
+    const feedback = await Feedback.findById(req.params.id)
+      .populate({
+        path: "idUser",
+        select: "-password"
+      })
+      .populate({
+        path: "idTrail"
+      });
+
     if (!feedback) {
       return res.status(404).json({ message: "Feedback not found" });
     }
@@ -67,6 +75,7 @@ router.get("/:id", tokenChecker, async (req, res) => {
     return res.status(500).json({ message: error.message });
   }
 });
+
 
 // -------- PUT /feedbacks/:id --------
 router.put(
@@ -148,7 +157,14 @@ router.get("/all/trail/:idTrail", tokenChecker, async (req, res) => {
       return res.status(404).json({ message: "Trail not found" });
     }
 
-    const feedbacks = await Feedback.find({ idTrail });
+    const feedbacks = await Feedback.find({ idTrail })
+      .populate({
+        path: "idUser",
+        select: "-password" 
+      })
+      .populate({
+        path: "idTrail"
+      });
     return res.status(200).json(feedbacks);
   } catch (error) {
     return res.status(500).json({ message: error.message });

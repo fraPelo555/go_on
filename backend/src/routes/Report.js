@@ -64,7 +64,14 @@ router.get("/:id", tokenChecker, async (req, res) => {
       return res.status(400).json({ message: "Invalid report id" });
     } 
 
-    const report = await Report.findById(req.params.id);
+    const report = await Report.findById(req.params.id).
+      populate({
+        path: "idUser",
+        select: "-password"
+      })
+      .populate({
+        path: "idTrail"
+      });
 
     if (!report) {
       return res.status(404).json({ message: "Report non trovato" });
@@ -166,7 +173,14 @@ router.get("/all/trail/:idTrail", tokenChecker, async (req, res) => {
     const trailExists = await Trail.exists({ _id: idTrail });
     if (!trailExists) return res.status(404).json({ message: "Trail not found" });
 
-    const reports = await Report.find({ idTrail });
+    const reports = await Report.find({ idTrail }).
+      populate({
+        path: "idUser",
+        select: "-password" 
+      })
+      .populate({
+        path: "idTrail"
+      });
     return res.status(200).json(reports);
   } catch (error) {
     console.error(error);

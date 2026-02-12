@@ -337,18 +337,23 @@ describe("GET /reports/:id", () => {
   });
 
   it("200 - report esistente", async () => {
-    const res = await request(app)
-      .get(`/reports/${report._id}`)
-      .set("Authorization", `Bearer ${token}`);
+  const res = await request(app)
+    .get(`/reports/${report._id}`)
+    .set("Authorization", `Bearer ${token}`);
 
-    expect(res.statusCode).toBe(200);
-    expect(res.body).toHaveProperty("id", report.id);
-    expect(res.body).toHaveProperty("testo", "Report di test");
-    expect(res.body).toHaveProperty("state", "New");
-    expect(res.body).toHaveProperty("idUser", user.id);
-    expect(res.body).toHaveProperty("idTrail", trail.id);
-    expect(normalize([res.body])).toMatchSnapshot();
-  });
+  expect(res.statusCode).toBe(200);
+
+  expect(res.body).toHaveProperty("id", report.id);
+  expect(res.body).toHaveProperty("testo", "Report di test");
+  expect(res.body).toHaveProperty("state", "New");
+  expect(res.body.idUser).toBeDefined();
+  expect(res.body.idUser.id).toBe(user.id);
+  expect(res.body.idTrail).toBeDefined();
+  expect(res.body.idTrail.id).toBe(trail.id);
+
+  expect(normalize([res.body])).toMatchSnapshot();
+});
+
 
   it("404 - report inesistente", async () => {
     const nonExistingId = new mongoose.Types.ObjectId();
@@ -501,7 +506,7 @@ describe("PUT /reports/:id", () => {
   });
 });
 
-describe("DELETE /reports/:id (improved)", () => {
+describe("DELETE /reports/:id", () => {
   let owner;
   let otherUser;
   let trail;
