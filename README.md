@@ -41,7 +41,6 @@ Per scaricare il progetto:
 4. git checkout -b backend origin/backend
 5. git checkout -b frontend origin/frontend
 
-
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////                                                 ////////////////////////////////
 ////////////////////////////////                     BACKEND                     ////////////////////////////////
@@ -60,46 +59,6 @@ Per avviare i test:
 DA FARE BACKEND:
 - ricollegare apiary e postman sul github nuovo
 - nella descrizione di Apiary il prof. descrive che il JWT può essere inserito tramite Header (x-access-token) e Query String. L'approccio moderno è utilizzare Bearer-token.
-
-API:
-- Trails
-    GET                     "/trails"       	                            Lista trail con filtri (region, valley, difficulty, tags, length, duration, ecc.)
-    POST                    "/trails"	                                    Creare un nuovo trail [Autenticazione+Admin]
-    PUT                     "/trails/{id}"      	                        Aggiornare un trail [Autenticazione+Admin] 
-    PUT                     "/trails/{id}/gpx"                              Upload/sostituzione del file gpx [Autenticazione+Admin]
-    DELETE	                "/trails/{id}"	                                Eliminare un trail [Autenticazione+Admin]
-    GET	                    "/trails/near"	                                Trovare tutti i trail entro un raggio da un punto geografico scelto
-    GET	                    "/trails/{id}"	                                Ottenere un trail tramite ID
-    GET	                    "/trails/{id}/download/gpx"                     Fare il download file GPX di un trail
-    GET	                    "/trails/{id}/gpx"                              Ottenere il file GPX di un trail per visualizzarlo su una mappa
-
-- Reports       
-    POST	                "/reports/{idTrail}"	                        Crea un nuovo report [Autenticazione]
-    GET	                    "/reports/all"	                                Ottenere la lista di tutti i report [Autenticazione+Admin] 
-    GET	                    "/reports/{id}"	                                Ottenere un report tramite ID [Autenticazione]
-    DELETE	                "/reports/{id}"	                                Eliminare un report [AutenticazioneSelf,Autenticazione+Admin]
-    GET	                    "/reports/all/trail/{idTrail}"                  Ottenere tutti i report associati a un trail [Autenticazione] 
-    GET	                    "/reports/all/user/{idUser}"                    Ottenere tutti i report creati da un utente [AutenticazioneSelf,Autenticazione+Admin]
-
-- Feedbacks     
-    POST	                "/feedbacks/{idTrail}"                          Creare un feedback (1 per utente/trail) [AutenticazioneSelf]
-    GET	                    "/feedbacks/all"                                Ottenere la lista di tutti feedback [Autenticazione+Admin]
-    GET	                    "/feedbacks/{id}"	                            Ottenere un feedback tramite ID [Autenticazione]
-    PUT                     "/feedbacks/{id}"	                            Aggiornare un feedback [AutenticazioneSelf,Autenticazione+Admin]
-    DELETE	                "/feedbacks/{id}"	                            Eliminare un feedback [AutenticazioneSelf,Autenticazione+Admin]
-    GET 	                "/feedbacks/all/trail/{idTrail}"	            Ottenere tutti i feedback di una trail specifica [Autenticazione]
-    GET                     "/feedbacks/all/user/{idUser}"	                Ottenere tutti i feedback di un certo utente [AutenticazioneSelf,Autenticazione+Admin]
-
-- Users {DA FARE: modificare le API in modo che funzionino}
-    POST	                "/users"	                                    Crea un nuovo utente e restituisce un JWT 
-    GET 	                "/users/all"                                    Lista di tutti gli utenti [Autenticazione+Admin]
-    GET	                    "/users/{id}"	                                Ottenere un utente [AutenticazioneSelf,Autenticazione+Admin] 
-    PUT	                    "/users/{id}"	                                Aggiornare un utente [AutenticazioneSelf,Autenticazione+Admin] 
-    DELETE                  "/users/{id}"	                                Eliminare un utente [AutenticazioneSelf,Autenticazione+Admin]
-    POST                    "/users/{idUser}/favourites/{idTrail}"          Aggiungere un trail ai preferiti di un certo utente [AutenticazioneSelf,Autenticazione+Admin]
-    DELETE                  "/users/{idUser}/favourites/{idTrail}"	        Rimuovere un trail dai preferiti di un certo utente [AutenticazioneSelf,Autenticazione+Admin] 
-    GET 	                "/users/favourites/{idUser}"	                Ottenere la lista dei trail preferiti di un utente [AutenticazioneSelf,Autenticazione+Admin]
-
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////                                                 ////////////////////////////////
