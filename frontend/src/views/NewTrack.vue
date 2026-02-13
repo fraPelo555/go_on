@@ -5,6 +5,7 @@ import { createTrail } from "../services/trailService";
 
 const router = useRouter();
 
+
 /* =========================
    ADMIN GUARD
    ========================= */

@@ -1,48 +1,53 @@
 <script setup>
-import { onMounted, ref } from "vue";
+import { ref, onMounted, watch } from "vue";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
-import "leaflet-gpx";
 
 const props = defineProps({
-  markers: {
-    type: Array,
-    default: () => []
-  },
-  gpx: {
-    type: String,
-    required: false,   // 🔴 NON obbligatorio
-    default: null
-  }
+  center: { type: Object, required: true }, // {lat, lon}
+  zoom: { type: Number, default: 13 }
 });
 
+const emit = defineEmits(["centerChanged"]);
 
-const mapContainer = ref(null);
-let map = null;
+const mapRef = ref(null);       // riferimento al div
+let mapInstance = null;         // istanza Leaflet
 
 onMounted(() => {
-  map = L.map(mapContainer.value).setView([45.4394, 7.6473], 13);
+  // inizializza mappa
+  mapInstance = L.map(mapRef.value).setView([props.center.lat, props.center.lon], props.zoom);
 
+  // tile layer OpenStreetMap
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "&copy; OpenStreetMap contributors"
-  }).addTo(map);
+    attribution: "&copy; OpenStreetMap contributors",
+    maxZoom: 19
+  }).addTo(mapInstance);
 
-  new L.GPX(props.gpx, { async: true })
-    .on("loaded", function (e) {
-      map.fitBounds(e.target.getBounds());
-    })
-    .addTo(map);
+  // ascolta movimenti della mappa
+  mapInstance.on("moveend", () => {
+    const c = mapInstance.getCenter();
+    emit("centerChanged", { lat: c.lat, lon: c.lng });
+  });
 });
+
+// Aggiorna la vista quando cambia props.center
+watch(
+  () => props.center,
+  (newCenter) => {
+    if (!mapInstance || !newCenter) return;
+    mapInstance.setView([Number(newCenter.lat), Number(newCenter.lon)], props.zoom, { animate: true });
+  },
+  { deep: true }
+);
 </script>
 
 <template>
-  <div ref="mapContainer" class="map"></div>
+  <div ref="mapRef" class="map-container"></div>
 </template>
 
 <style scoped>
-.map {
+.map-container {
   width: 100%;
   height: 100%;
-  z-index:0;
 }
 </style>

@@ -30,7 +30,11 @@ export const deleteTrail = (id) =>
 
 // Download GPX
 export const downloadGPX = (id) =>
-  api.get(`/trails/${id}/gpx`, { responseType: "blob" });
+  api.get(`/trails/${id}/download/gpx`, { responseType: "blob" });
+
+// Retrieve GPX
+export const getGPX = (id) =>
+  api.get(`/trails/${id}/gpx`, { responseType: "text" });
 
 // Trail vicini
 export const getNearbyTrails = (lat, lon, radius) =>
