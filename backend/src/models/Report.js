@@ -32,8 +32,8 @@ const reportSchema = new Schema(
     },
     state: {
       type: String,
-      enum: ["New", "In progress", "Resolved"],
-      default: "New" 
+      enum: ["Nuovo", "In progresso", "Risolto"],
+      default: "Nuovo" 
     } 
   },
   {
