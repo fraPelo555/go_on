@@ -1,39 +1,3 @@
-Progetto/
-├─ .github/
-│  └─ workflows/
-│     ├─ backend.yml
-│     └─ frontend.yml
-├─ backend/
-│  ├─ package.json
-│  ├─ package-lock.json
-│  └─ src/
-│     ├─ middlewares/
-│     │  ├─ requireRole.js
-│     │  ├─ selfOrAdmin.js
-│     │  └─ TokenChecker.js
-│     ├─ models/
-│     │  ├─ Feedback.js
-│     │  ├─ Report.js
-│     │  ├─ Trail.js
-│     │  └─ User.js
-│     ├─ routes/
-│     │  ├─ Feedback.js
-│     │  ├─ Report.js
-│     │  ├─ Trail.js
-│     │  └─ User.js
-│     ├─ uploads/
-│     ├─ app.js
-│     └─ db.js
-├─ frontend/
-│  ├─ package.json
-│  ├─ package-lock.json
-│  └─ src/...
-├─ .gitignore
-├─ README.md
-
-Attenzione: 
-- Cartella .github/workflows viene creata automaticamente nel deployment.
-
 Per scaricare il progetto:
 1. git config --global credential.helper manager
 2. gh auth login
@@ -53,12 +17,22 @@ Per avviare il progetto:
 3. npm run dev
 
 Per avviare i test:
-- npm run test 
-- npm run test -- tests/"NomeFile".test.js
+1. npm run test 
+
+Per creare un commit locale:
+1. git add .
+2. git commit -m"Messaggio"
+
+Per fare il push del commit locale verso l'origin remoto (Github):
+1. git push origin backend
+
+Per fare il merge del commit locale verso il main:
+1. git switch main
+2. git merge --no-ff backend -m"Merge backend into main"
+3. git push origin main
 
 DA FARE BACKEND:
 - ricollegare apiary e postman sul github nuovo
-- nella descrizione di Apiary il prof. descrive che il JWT può essere inserito tramite Header (x-access-token) e Query String. L'approccio moderno è utilizzare Bearer-token.
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////                                                 ////////////////////////////////
