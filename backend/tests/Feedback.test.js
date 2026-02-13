@@ -271,7 +271,11 @@ describe("GET /feedbacks/all", () => {
         expect.objectContaining({ valutazione: 3, testo: "Discreto" }),
       ]),
     );
-    expect(normalize(res.body)).toMatchSnapshot();
+    const sorted = normalize(res.body).sort(
+      (a, b) => a.valutazione - b.valutazione,
+    );
+
+    expect(sorted).toMatchSnapshot();
   });
 
   it("200 - filtro per valutazione", async () => {
@@ -282,7 +286,7 @@ describe("GET /feedbacks/all", () => {
     expect(res.status).toBe(200);
     expect(res.body.length).toBe(1);
     expect(res.body[0].valutazione).toBe(5);
-    expect(normalize([res.body])).toMatchSnapshot();
+    expect(normalize(res.body)).toMatchSnapshot();
   });
 
   it("400 - filtro valutazione non valido", async () => {
@@ -340,12 +344,13 @@ describe("GET /feedbacks/:id", () => {
       .set("Authorization", `Bearer ${token}`);
 
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({
-      idUser: user.id,
-      idTrail: trail.id,
-      testo: "Percorso molto bello",
-      valutazione: 4,
-    });
+    expect(res.body.testo).toBe("Percorso molto bello");
+    expect(res.body.valutazione).toBe(4);
+    expect(res.body.idUser).toBeDefined();
+    expect(res.body.idUser.id).toBe(user.id);
+    expect(res.body.idTrail).toBeDefined();
+    expect(res.body.idTrail.id).toBe(trail.id);
+
     expect(normalize([res.body])).toMatchSnapshot();
   });
 
@@ -636,12 +641,18 @@ describe("GET /feedbacks/all/trail/:idTrail", () => {
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
     expect(res.body.length).toBe(1);
-    expect(res.body[0]).toMatchObject({
-      idUser: user.id,
-      idTrail: trail.id,
-      testo: "Feedback sul trail",
-      valutazione: 4,
-    });
+
+    const fb = res.body[0];
+
+    expect(fb.testo).toBe("Feedback sul trail");
+    expect(fb.valutazione).toBe(4);
+
+    expect(fb.idUser).toBeDefined();
+    expect(fb.idUser.id).toBe(user.id);
+
+    expect(fb.idTrail).toBeDefined();
+    expect(fb.idTrail.id).toBe(trail.id);
+
     expect(normalize(res.body)).toMatchSnapshot();
   });
 

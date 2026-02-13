@@ -251,7 +251,10 @@ describe("GET /reports/all", () => {
     expect(res.statusCode).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
     expect(res.body).toHaveLength(3);
-    expect(normalize(res.body)).toMatchSnapshot();
+    const sorted = normalize(res.body).sort((a, b) =>
+      a.state.localeCompare(b.state)
+    );
+    expect(sorted).toMatchSnapshot();
   });
 
   it("200 - filtro state=New", async () => {
@@ -275,7 +278,10 @@ describe("GET /reports/all", () => {
 
     const states = res.body.map((r) => r.state);
     expect(states).toEqual(expect.arrayContaining(["New", "Resolved"]));
-    expect(normalize([res.body])).toMatchSnapshot();
+    const sorted = normalize(res.body).sort((a, b) =>
+  a.state.localeCompare(b.state)
+);
+expect(sorted).toMatchSnapshot();
   });
 
   it("200 - filtro senza match", async () => {
@@ -331,18 +337,23 @@ describe("GET /reports/:id", () => {
   });
 
   it("200 - report esistente", async () => {
-    const res = await request(app)
-      .get(`/reports/${report._id}`)
-      .set("Authorization", `Bearer ${token}`);
+  const res = await request(app)
+    .get(`/reports/${report._id}`)
+    .set("Authorization", `Bearer ${token}`);
 
-    expect(res.statusCode).toBe(200);
-    expect(res.body).toHaveProperty("id", report.id);
-    expect(res.body).toHaveProperty("testo", "Report di test");
-    expect(res.body).toHaveProperty("state", "New");
-    expect(res.body).toHaveProperty("idUser", user.id);
-    expect(res.body).toHaveProperty("idTrail", trail.id);
-    expect(normalize([res.body])).toMatchSnapshot();
-  });
+  expect(res.statusCode).toBe(200);
+
+  expect(res.body).toHaveProperty("id", report.id);
+  expect(res.body).toHaveProperty("testo", "Report di test");
+  expect(res.body).toHaveProperty("state", "New");
+  expect(res.body.idUser).toBeDefined();
+  expect(res.body.idUser.id).toBe(user.id);
+  expect(res.body.idTrail).toBeDefined();
+  expect(res.body.idTrail.id).toBe(trail.id);
+
+  expect(normalize([res.body])).toMatchSnapshot();
+});
+
 
   it("404 - report inesistente", async () => {
     const nonExistingId = new mongoose.Types.ObjectId();
@@ -495,7 +506,7 @@ describe("PUT /reports/:id", () => {
   });
 });
 
-describe("DELETE /reports/:id (improved)", () => {
+describe("DELETE /reports/:id", () => {
   let owner;
   let otherUser;
   let trail;
@@ -601,7 +612,7 @@ describe("DELETE /reports/:id (improved)", () => {
   });
 });
 
-describe("GET /reports/all/trail/:idTrail (updated)", () => {
+describe("GET /reports/all/trail/:idTrail", () => {
   let token;
   let user;
   let trailWithReports;
@@ -700,7 +711,10 @@ describe("GET /reports/all/trail/:idTrail (updated)", () => {
 
     const texts = res.body.map((r) => r.testo);
     expect(texts).toEqual(expect.arrayContaining(["Report 1", "Report 2"]));
-    expect(normalize(res.body)).toMatchSnapshot();
+    const sorted = normalize(res.body).sort((a, b) =>
+      a.state.localeCompare(b.state)
+    );
+    expect(sorted).toMatchSnapshot();
   });
 
   it("200 - più report sullo stesso trail", async () => {
@@ -717,7 +731,10 @@ describe("GET /reports/all/trail/:idTrail (updated)", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.body).toHaveLength(3);
-    expect(normalize(res.body)).toMatchSnapshot();
+    const sorted = normalize(res.body).sort((a, b) =>
+      a.state.localeCompare(b.state)
+    );
+    expect(sorted).toMatchSnapshot();
   });
 });
 
@@ -808,7 +825,10 @@ describe("GET /reports/all/user/:idUser", () => {
     expect(res.body).toHaveLength(2);
     const texts = res.body.map((r) => r.testo);
     expect(texts).toEqual(expect.arrayContaining(["Report 1", "Report 2"]));
-    expect(normalize(res.body)).toMatchSnapshot();
+    const sorted = normalize(res.body).sort((a, b) =>
+      a.state.localeCompare(b.state)
+    );
+    expect(sorted).toMatchSnapshot();
   });
 
   it("200 - admin legge i report di un user", async () => {
@@ -818,7 +838,10 @@ describe("GET /reports/all/user/:idUser", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.body).toHaveLength(2);
-    expect(normalize(res.body)).toMatchSnapshot();
+    const sorted = normalize(res.body).sort((a, b) =>
+      a.state.localeCompare(b.state)
+    );
+    expect(sorted).toMatchSnapshot();
   });
 
   it("200 - user esistente senza report", async () => {

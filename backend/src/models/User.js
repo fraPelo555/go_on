@@ -22,10 +22,9 @@ const userSchema = new mongoose.Schema({
   favourites: [
     {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Trail" // riferimento al modello Trail
+      ref: "Trail"
     }
-  ],
-  default: []
+  ]
 }, {
   timestamps: true,
   toJSON: { virtuals: true },

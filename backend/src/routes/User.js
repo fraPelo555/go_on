@@ -1,6 +1,7 @@
 const express = require("express");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcrypt");
+const mongoose = require("mongoose");
 const { OAuth2Client } = require("google-auth-library");
 
 const { User } = require("../models/User");
@@ -8,109 +9,84 @@ const { Trail } = require("../models/Trail");
 const { Feedback } = require("../models/Feedback");
 const { Report } = require("../models/Report");
 
-const { tokenChecker } = require("../middlewares/TokenChecker");
-const { requireRole } = require("../middlewares/RequireRole");
-const { selfOrAdmin } = require("../middlewares/SelfOrAdmin");
+const { tokenChecker } = require("../middlewares/tokenChecker");
+const { requireRole } = require("../middlewares/requireRole");
+const { selfOrAdmin } = require("../middlewares/selfOrAdmin");
 
 const router = express.Router();
 
-// Versione senza autenticazione google, ma con jwt token
+const dotenv = require("dotenv");
+dotenv.config();
+
 // -------- POST /users --------
-/*
-router.post("/", async (req, res) => {
-  try {
-    const { username, email, password } = req.body;
-
-    if (!email || !password) {
-      return res.status(400).json({ success: false, message: "Email and password are required" });
-    }
-
-    let user = await User.findOne({ email });
-
-    if (user) {
-      const validPassword = await bcrypt.compare(password, user.password);
-      if (!validPassword) {
-        return res.status(401).json({ success: false, message: "Authentication failed. Wrong password." });
-      }
-    } else {
-      const hashedPassword = await bcrypt.hash(password, 10);
-
-      user = new User({
-        username,
-        email,
-        password: hashedPassword,
-      });
-
-      await user.save();
-    }
-
-    const payload = {
-      id: user._id.toString(),
-      username: user.username,
-      email: user.email,
-    };
-
-    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: "24h" });
-
-    res.status(user.isNew ? 201 : 200).json({
-      success: true,
-      message: user.isNew ? "User created and authenticated" : "User authenticated",
-      token,
-      id: user._id,
-      email: user.email,
-      username: user.username,
-    });
-
-  } catch (error) {
-    console.error(error);
-    if (error.name === "ValidationError") {
-      return res.status(400).json({ success: false, message: error.message, errors: error.errors });
-    }
-    return res.status(500).json({ success: false, message: "Internal server error" });
-  }
-});
-*/
-// Versione completa
-// -------- POST /users --------
+function getGoogleClient() {
+  return new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+}
 router.post("/", async (req, res) => {
   try {
     let user;
+    let isNewUser = false;
     const { username, email, password, googleToken } = req.body;
 
     if (googleToken) {
+      const client = getGoogleClient();
+
       const ticket = await client.verifyIdToken({
         idToken: googleToken,
         audience: process.env.GOOGLE_CLIENT_ID,
       });
+
       const payload = ticket.getPayload();
       const googleEmail = payload.email;
       const googleName = payload.name;
 
       user = await User.findOne({ email: googleEmail });
+
       if (!user) {
-        const placeholderPassword = await bcrypt.hash("default-google-password-to-be-changed", 10);
+        const placeholderPassword = await bcrypt.hash(
+          "default-google-password-to-be-changed",
+          10,
+        );
+
         user = new User({
           username: googleName || googleEmail.split("@")[0],
           email: googleEmail,
           password: placeholderPassword,
         });
-        await user.save();
-        console.log("User created after Google login");
-      }
 
+        await user.save();
+        isNewUser = true;
+      }
     } else {
       if (!email || !password) {
-        return res.status(400).json({ success: false, message: "Email and password are required" });
+        return res.status(400).json({
+          success: false,
+          message: "Email and password are required",
+        });
       }
 
       user = await User.findOne({ email });
-      if (!user) {
-        return res.status(401).json({ success: false, message: "Authentication failed. User not found." });
-      }
 
-      const validPassword = await bcrypt.compare(password, user.password);
-      if (!validPassword) {
-        return res.status(401).json({ success: false, message: "Authentication failed. Wrong password." });
+      if (!user) {
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        user = new User({
+          username: username || email.split("@")[0],
+          email,
+          password: hashedPassword,
+        });
+
+        await user.save();
+        isNewUser = true;
+      } else {
+        const validPassword = await bcrypt.compare(password, user.password);
+
+        if (!validPassword) {
+          return res.status(401).json({
+            success: false,
+            message: "Authentication failed. Wrong password.",
+          });
+        }
       }
     }
 
@@ -119,32 +95,48 @@ router.post("/", async (req, res) => {
       username: user.username,
       email: user.email,
       role: user.role,
-      self: `api/v1/users/${user._id}`,
+      self: `/`,
     };
 
-    const token = jwt.sign(jwtPayload, process.env.JWT_SECRET, { expiresIn: "24h" });
+    const token = jwt.sign(jwtPayload, process.env.JWT_SECRET, {
+      expiresIn: "24h",
+    });
 
-    res.status(200).json({
+    return res.status(isNewUser ? 201 : 200).json({
       success: true,
-      message: "User authenticated",
+      message: isNewUser
+        ? "User created and authenticated"
+        : "User authenticated",
       token,
       id: user._id,
       email: user.email,
       username: user.username,
       role: user.role,
     });
-
   } catch (error) {
     console.error(error);
+
     if (error.name === "ValidationError") {
-      return res.status(400).json({ success: false, message: error.message, errors: error.errors });
+      return res.status(400).json({
+        success: false,
+        message: error.message,
+        errors: error.errors,
+      });
     }
-    res.status(500).json({ success: false, message: "Internal server error", error: error.message });
+
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error",
+      error: error.message,
+    });
   }
 });
 
 // -------- GET /users/all --------
-router.get("/all", tokenChecker, requireRole("admin"), async (req, res) => {
+router.get("/all", 
+  tokenChecker, 
+  requireRole("admin"), 
+  async (req, res) => {
   try {
     const users = await User.find().select("-password");
 
@@ -164,95 +156,137 @@ router.get("/all", tokenChecker, requireRole("admin"), async (req, res) => {
 });
 
 // -------- GET /users/:id --------
-router.get("/:id", tokenChecker, async (req, res, next) => {
-  const { id } = req.params;
-
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ success: false, message: "Invalid user id" });
-  }
-
-  try {
-    const user = await User.findById(id).select("-password");
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-
-    req.targetUser = user;
-    next();
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ success: false, message: "Internal server error", error: error.message });
-  }
-}, selfOrAdmin((req) => req.targetUser._id), (req, res) => {
-  res.status(200).json({
-    success: true,
-    user: req.targetUser,
-  });
-});
-
-// -------- PUT /users/:id --------
-router.put("/:id", tokenChecker, selfOrAdmin((req) => req.params.id), async (req, res) => {
-  try {
+router.get(
+  "/:id",
+  tokenChecker,
+  async (req, res, next) => {
     const { id } = req.params;
-    const { email, role, password, ...allowedUpdates } = req.body;
-
-    if (email || role) {
-      return res.status(400).json({ success: false, message: "Cannot modify email or role" });
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid user id" });
     }
-
-    if (password) {
-      allowedUpdates.password = await bcrypt.hash(password, 10);
+    try {
+      const user = await User.findById(id).select("-password");
+      if (!user) {
+        return res
+          .status(404)
+          .json({ success: false, message: "User not found" });
+      }
+      req.targetUser = user;
+      next();
+    } catch (error) {
+      console.error(error);
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message
+      });
     }
-
-    const updatedUser = await User.findByIdAndUpdate(
-      id,
-      allowedUpdates,
-      { new: true, runValidators: true }
-    ).select("-password"); 
-
-    if (!updatedUser) {
-      return res.status(404).json({ success: false, message: "User not found" });
-    }
-
+  },
+  selfOrAdmin((req) => req.targetUser._id),
+  (req, res) => {
     res.status(200).json({
       success: true,
-      message: "User updated successfully",
-      user: updatedUser
+      user: req.targetUser,
     });
+  },
+);
 
-  } catch (error) {
-    console.error(error);
-    if (error.name === "ValidationError") {
-      return res.status(400).json({ success: false, message: error.message, errors: error.errors });
+// -------- PUT /users/:id --------
+router.put(
+  "/:id",
+  tokenChecker,
+  selfOrAdmin((req) => req.params.id),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { email, role, password, ...allowedUpdates } = req.body;
+
+      if (email || role) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Cannot modify email or role" });
+      }
+
+      if (password) {
+        allowedUpdates.password = await bcrypt.hash(password, 10);
+      }
+
+      const updatedUser = await User.findByIdAndUpdate(id, allowedUpdates, {
+        new: true,
+        runValidators: true,
+      }).select("-password");
+
+      if (!updatedUser) {
+        return res
+          .status(404)
+          .json({ success: false, message: "User not found" });
+      }
+
+      res.status(200).json({
+        success: true,
+        message: "User updated successfully",
+        user: updatedUser,
+      });
+    } catch (error) {
+      console.error(error);
+      if (error.name === "ValidationError") {
+        return res.status(400).json({
+          success: false,
+          message: error.message,
+          errors: error.errors,
+        });
+      }
+      res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
     }
-    res.status(500).json({ success: false, message: "Internal server error", error: error.message });
-  }
-});
+  },
+);
 
 // -------- DELETE /users/:id --------
-router.delete("/:id", tokenChecker, selfOrAdmin((req) => req.params.id), async (req, res) => {
-  const { id } = req.params;
+router.delete(
+  "/:id",
+  tokenChecker,
+  selfOrAdmin(async (req) => req.params.id),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
 
-  if (!mongoose.Types.ObjectId.isValid(id)) {
-    return res.status(400).json({ success: false, message: "Invalid user id" });
-  }
+      if (!mongoose.Types.ObjectId.isValid(id)) {
+        return res.status(400).json({
+          success: false,
+          message: "Invalid user id",
+        });
+      }
 
-  try {
-    const user = await User.findById(id);
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found" });
+      const user = await User.findById(id);
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "User not found",
+        });
+      }
+
+      await Feedback.deleteMany({ idUser: id });
+      await Report.deleteMany({ idUser: id });
+      await User.findByIdAndDelete(id);
+
+      return res.status(200).json({
+        success: true,
+        message: "User deleted successfully",
+      });
+    } catch (err) {
+      return res.status(500).json({
+        success: false,
+        message: err.message,
+      });
     }
-
-    await Feedback.deleteMany({ idUser: id });
-    await Report.deleteMany({ idUser: id });
-    await User.findByIdAndDelete(id);
-
-    return res.status(204).send();
-  } catch (error) {
-    console.error(error);
-    return res.status(500).json({ success: false, message: "Internal server error", error: error.message });
   }
-});
+);
 
 // -------- POST /users/:idUser/favourites/:idTrail --------
 router.post(
@@ -261,23 +295,34 @@ router.post(
   selfOrAdmin((req) => req.params.idUser),
   async (req, res) => {
     const { idUser, idTrail } = req.params;
-    if (!mongoose.Types.ObjectId.isValid(idUser) || !mongoose.Types.ObjectId.isValid(idTrail)) {
-      return res.status(400).json({ success: false, message: "Invalid user or trail id" });
+    if (
+      !mongoose.Types.ObjectId.isValid(idUser) ||
+      !mongoose.Types.ObjectId.isValid(idTrail)
+    ) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid user or trail id" });
     }
 
     try {
       const user = await User.findById(idUser);
       if (!user) {
-        return res.status(404).json({ success: false, message: "User not found" });
+        return res
+          .status(404)
+          .json({ success: false, message: "User not found" });
       }
 
       const trailExists = await Trail.exists({ _id: idTrail });
       if (!trailExists) {
-        return res.status(404).json({ success: false, message: "Trail not found" });
+        return res
+          .status(404)
+          .json({ success: false, message: "Trail not found" });
       }
 
       if (user.favourites.includes(idTrail)) {
-        return res.status(409).json({ success: false, message: "Trail already in favourites" });
+        return res
+          .status(409)
+          .json({ success: false, message: "Trail already in favourites" });
       }
 
       user.favourites.push(idTrail);
@@ -290,9 +335,13 @@ router.post(
       });
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ success: false, message: "Internal server error", error: error.message });
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
     }
-  }
+  },
 );
 
 // -------- DELETE /users/:idUser/favourites/:idTrail --------
@@ -303,19 +352,28 @@ router.delete(
   async (req, res) => {
     const { idUser, idTrail } = req.params;
 
-    if (!mongoose.Types.ObjectId.isValid(idUser) || !mongoose.Types.ObjectId.isValid(idTrail)) {
-      return res.status(400).json({ success: false, message: "Invalid user or trail id" });
+    if (
+      !mongoose.Types.ObjectId.isValid(idUser) ||
+      !mongoose.Types.ObjectId.isValid(idTrail)
+    ) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid user or trail id" });
     }
 
     try {
       const user = await User.findById(idUser);
       if (!user) {
-        return res.status(404).json({ success: false, message: "User not found" });
+        return res
+          .status(404)
+          .json({ success: false, message: "User not found" });
       }
 
       const index = user.favourites.indexOf(idTrail);
       if (index === -1) {
-        return res.status(404).json({ success: false, message: "Favourite trail not found" });
+        return res
+          .status(404)
+          .json({ success: false, message: "Favourite trail not found" });
       }
 
       user.favourites.splice(index, 1);
@@ -324,9 +382,13 @@ router.delete(
       return res.status(204).send();
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ success: false, message: "Internal server error", error: error.message });
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
     }
-  }
+  },
 );
 
 // -------- GET /users/favourites/:idUser --------
@@ -338,13 +400,17 @@ router.get(
     const { idUser } = req.params;
 
     if (!mongoose.Types.ObjectId.isValid(idUser)) {
-      return res.status(400).json({ success: false, message: "Invalid user id" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Invalid user id" });
     }
 
     try {
       const user = await User.findById(idUser).populate("favourites");
       if (!user) {
-        return res.status(404).json({ success: false, message: "User not found" });
+        return res
+          .status(404)
+          .json({ success: false, message: "User not found" });
       }
 
       return res.status(200).json({
@@ -354,9 +420,13 @@ router.get(
       });
     } catch (error) {
       console.error(error);
-      return res.status(500).json({ success: false, message: "Internal server error", error: error.message });
+      return res.status(500).json({
+        success: false,
+        message: "Internal server error",
+        error: error.message,
+      });
     }
-  }
+  },
 );
 
 module.exports = router;
