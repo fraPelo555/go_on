@@ -533,7 +533,7 @@ describe("DELETE /trails/:id", () => {
       idTrail: existingTrail.id,
       idUser: admin.id,
       testo: "Report di test",
-      state: "New",
+      state: "Nuovo",
     });
 
     await User.findByIdAndUpdate(admin.id, {

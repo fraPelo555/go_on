@@ -25,7 +25,6 @@ const storage = multer.diskStorage({
     if (!fs.existsSync(trailDir)) {
       fs.mkdirSync(trailDir, { recursive: true });
     }
-
     cb(null, trailDir);
   },
 
