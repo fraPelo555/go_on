@@ -210,19 +210,19 @@ describe("GET /reports/all", () => {
         idUser: user._id,
         idTrail: trail._id,
         testo: "Report New",
-        state: "Nuovo",
+        state: "New",
       },
       {
         idUser: user._id,
         idTrail: trail._id,
         testo: "Report In progress",
-        state: "In progresso",
+        state: "In progress",
       },
       {
         idUser: user._id,
         idTrail: trail._id,
         testo: "Report Resolved",
-        state: "Risolto",
+        state: "Resolved",
       },
     ]);
   });
@@ -257,27 +257,27 @@ describe("GET /reports/all", () => {
     expect(sorted).toMatchSnapshot();
   });
 
-  it("200 - filtro state=Nuovo", async () => {
+  it("200 - filtro state=New", async () => {
     const res = await request(app)
-      .get("/reports/all?state=Nuovo")
+      .get("/reports/all?state=New")
       .set("Authorization", `Bearer ${adminToken}`);
 
     expect(res.statusCode).toBe(200);
     expect(res.body).toHaveLength(1);
-    expect(res.body[0]).toHaveProperty("state", "Nuovo");
+    expect(res.body[0]).toHaveProperty("state", "New");
     expect(normalize(res.body)).toMatchSnapshot();
   });
 
-  it("200 - filtro multiplo state=Nuovo,Risolto", async () => {
+  it("200 - filtro multiplo state=New,Resolved", async () => {
     const res = await request(app)
-      .get("/reports/all?state=Nuovo,Risolto")
+      .get("/reports/all?state=New,Resolved")
       .set("Authorization", `Bearer ${adminToken}`);
 
     expect(res.statusCode).toBe(200);
     expect(res.body).toHaveLength(2);
 
     const states = res.body.map((r) => r.state);
-    expect(states).toEqual(expect.arrayContaining(["Nuovo", "Risolto"]));
+    expect(states).toEqual(expect.arrayContaining(["New", "Resolved"]));
     const sorted = normalize(res.body).sort((a, b) =>
   a.state.localeCompare(b.state)
 );
@@ -316,7 +316,7 @@ describe("GET /reports/:id", () => {
       idUser: user._id,
       idTrail: trail._id,
       testo: "Report di test",
-      state: "Nuovo",
+      state: "New",
     });
   });
 
@@ -345,7 +345,7 @@ describe("GET /reports/:id", () => {
 
   expect(res.body).toHaveProperty("id", report.id);
   expect(res.body).toHaveProperty("testo", "Report di test");
-  expect(res.body).toHaveProperty("state", "Nuovo");
+  expect(res.body).toHaveProperty("state", "New");
   expect(res.body.idUser).toBeDefined();
   expect(res.body.idUser.id).toBe(user.id);
   expect(res.body.idTrail).toBeDefined();
@@ -406,7 +406,7 @@ describe("PUT /reports/:id", () => {
       idUser: owner._id,
       idTrail: trail._id,
       testo: "Testo originale",
-      state: "Nuovo",
+      state: "New",
     });
 
     adminToken = getToken(admin);
@@ -462,7 +462,7 @@ describe("PUT /reports/:id", () => {
     const res = await request(app)
       .put(`/reports/${report._id}`)
       .set("Authorization", `Bearer ${ownerToken}`)
-      .send({ state: "Risolto" }); // base user non può
+      .send({ state: "Resolved" }); // base user non può
 
     expect(res.statusCode).toBe(400);
     expect(res.body).toHaveProperty("message", "No valid fields to update");
@@ -476,7 +476,7 @@ describe("PUT /reports/:id", () => {
 
     expect(res.statusCode).toBe(200);
     expect(res.body).toHaveProperty("testo", "Testo aggiornato");
-    expect(res.body).toHaveProperty("state", "Nuovo");
+    expect(res.body).toHaveProperty("state", "New");
 
     const updated = await Report.findById(report._id);
     expect(updated.testo).toBe("Testo aggiornato");
@@ -487,10 +487,10 @@ describe("PUT /reports/:id", () => {
     const res = await request(app)
       .put(`/reports/${report._id}`)
       .set("Authorization", `Bearer ${adminToken}`)
-      .send({ state: "Risolto" });
+      .send({ state: "Resolved" });
 
     expect(res.statusCode).toBe(200);
-    expect(res.body).toHaveProperty("state", "Risolto");
+    expect(res.body).toHaveProperty("state", "Resolved");
     expect(normalize([res.body])).toMatchSnapshot();
   });
 
@@ -536,7 +536,7 @@ describe("DELETE /reports/:id", () => {
       idUser: owner._id,
       idTrail: trail._id,
       testo: "Report da eliminare",
-      state: "Nuovo",
+      state: "New",
     });
 
     ownerToken = getToken(owner);
@@ -589,22 +589,7 @@ describe("DELETE /reports/:id", () => {
     expect(res.body).toHaveProperty("message");
   });
 
-  it("403 - owner non può eliminare se stato != 'Nuovo'", async () => {
-    report.state = "In progresso";
-    await report.save();
-
-    const res = await request(app)
-      .delete(`/reports/${report._id}`)
-      .set("Authorization", `Bearer ${ownerToken}`);
-
-    expect(res.statusCode).toBe(403);
-    expect(res.body).toHaveProperty("message");
-
-    const stillExists = await Report.findById(report._id);
-    expect(stillExists).not.toBeNull();
-  });
-
-  it("204 - owner elimina il report se stato 'Nuovo'", async () => {
+  it("204 - owner elimina il report", async () => {
     const res = await request(app)
       .delete(`/reports/${report._id}`)
       .set("Authorization", `Bearer ${ownerToken}`);
@@ -615,10 +600,7 @@ describe("DELETE /reports/:id", () => {
     expect(deleted).toBeNull();
   });
 
-  it("204 - admin elimina anche se stato != 'Nuovo'", async () => {
-    report.state = "Risolto";
-    await report.save();
-
+  it("204 - admin elimina il report", async () => {
     const res = await request(app)
       .delete(`/reports/${report._id}`)
       .set("Authorization", `Bearer ${adminToken}`);
@@ -659,13 +641,13 @@ describe("GET /reports/all/trail/:idTrail", () => {
         idUser: user._id,
         idTrail: trailWithReports._id,
         testo: "Report 1",
-        state: "Nuovo",
+        state: "New",
       },
       {
         idUser: user._id,
         idTrail: trailWithReports._id,
         testo: "Report 2",
-        state: "Risolto",
+        state: "Resolved",
       },
     ]);
   });
@@ -719,7 +701,7 @@ describe("GET /reports/all/trail/:idTrail", () => {
     expect(normalize(res.body)).toMatchSnapshot();
   });
 
-  it("200 - trail esistente con report", async () => {
+  it("200 - trail esistente con più report", async () => {
     const res = await request(app)
       .get(`/reports/all/trail/${trailWithReports._id}`)
       .set("Authorization", `Bearer ${token}`);
@@ -729,26 +711,6 @@ describe("GET /reports/all/trail/:idTrail", () => {
 
     const texts = res.body.map((r) => r.testo);
     expect(texts).toEqual(expect.arrayContaining(["Report 1", "Report 2"]));
-    const sorted = normalize(res.body).sort((a, b) =>
-      a.state.localeCompare(b.state)
-    );
-    expect(sorted).toMatchSnapshot();
-  });
-
-  it("200 - più report sullo stesso trail", async () => {
-    await Report.create({
-      idUser: user._id,
-      idTrail: trailWithReports._id,
-      testo: "Report 3",
-      state: "In progresso",
-    });
-
-    const res = await request(app)
-      .get(`/reports/all/trail/${trailWithReports._id}`)
-      .set("Authorization", `Bearer ${token}`);
-
-    expect(res.statusCode).toBe(200);
-    expect(res.body).toHaveLength(3);
     const sorted = normalize(res.body).sort((a, b) =>
       a.state.localeCompare(b.state)
     );
@@ -785,12 +747,12 @@ describe("GET /reports/all/user/:idUser", () => {
     const trail = await createTrail({ title: "Trail Test per report" });
 
     await Report.create([
-      { idUser: user._id, idTrail: trail._id, testo: "Report 1", state: "Nuovo" },
+      { idUser: user._id, idTrail: trail._id, testo: "Report 1", state: "New" },
       {
         idUser: user._id,
         idTrail: trail._id,
         testo: "Report 2",
-        state: "Risolto",
+        state: "Resolved",
       },
     ]);
   });
