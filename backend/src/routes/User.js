@@ -9,9 +9,9 @@ const { Trail } = require("../models/Trail");
 const { Feedback } = require("../models/Feedback");
 const { Report } = require("../models/Report");
 
-const { tokenChecker } = require("../middlewares/TokenChecker");
-const { requireRole } = require("../middlewares/RequireRole");
-const { selfOrAdmin } = require("../middlewares/SelfOrAdmin");
+const { tokenChecker } = require("../middlewares/tokenChecker");
+const { requireRole } = require("../middlewares/requireRole");
+const { selfOrAdmin } = require("../middlewares/selfOrAdmin");
 
 const router = express.Router();
 

@@ -5,8 +5,8 @@ const { Report } = require("../models/Report");
 const { User } = require("../models/User");
 const { upload, uploadBaseDir } = require("./Storage");
 
-const { tokenChecker } = require("../middlewares/TokenChecker");
-const { requireRole } = require("../middlewares/RequireRole");
+const { tokenChecker } = require("../middlewares/tokenChecker");
+const { requireRole } = require("../middlewares/requireRole");
 
 const fs = require("fs");
 const path = require("path");
