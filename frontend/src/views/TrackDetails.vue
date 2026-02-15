@@ -3,17 +3,50 @@ import { ref, computed, onMounted } from "vue";
 import { useRoute } from "vue-router";
 import { jsPDF } from "jspdf";
 import html2canvas from "html2canvas";
-import { getTrailById, downloadGPX as apiDownloadGPX } from "../services/trailService";
-import { getTrailFeedbacks, createFeedback, deleteFeedback } from "../services/feedbackService";
-import { getFavourites, addFavourite, removeFavourite } from "../services/userService";
+
+import { 
+  getTrailById, 
+  downloadGPX as apiDownloadGPX, 
+  getGPX 
+} from "../services/trailService";
+
+import { 
+  getTrailFeedbacks, 
+  createFeedback, 
+  deleteFeedback,
+  updateFeedback
+} from "../services/feedbackService";
+
+import { 
+  getFavourites, 
+  addFavourite, 
+  removeFavourite 
+} from "../services/userService";
+
 import TrailMap from "../components/TrailMap.vue";
-import { getTrailReports, createReport, deleteReport } from "../services/reportService";
+
+import { 
+  getTrailReports, 
+  createReport, 
+  deleteReport, 
+  updateReport, 
+  getReportById 
+} from "../services/reportService";
 
 /* --------------------------
    ROUTE
 -------------------------- */
 const route = useRoute();
 const trailId = route.params.id;
+
+/* --------------------------
+   AUTH
+-------------------------- */
+const token = localStorage.getItem("token");
+const userId = localStorage.getItem("userId") || null;
+const isAdmin = localStorage.getItem("isAdmin") === "true";
+const isLogged = !!token;
+const showProfile = !!token;
 
 /* --------------------------
    STATE
@@ -30,16 +63,12 @@ const newComment = ref("");
 const selectedRating = ref(0);
 const hoverRating = ref(0);
 
-const userId = localStorage.getItem("userId") || null;
+const editingFeedbackId = ref(null);
+const editedCommentText = ref("");
+
 const isFav = ref(false);
 const checkingFav = ref(false);
-
-/* --------------------------
-   HEADER LOGIC
--------------------------- */
-const token = localStorage.getItem("token");
-const isAdmin = localStorage.getItem("isAdmin") === "true";
-const showProfile = !!token;
+const username = ref(localStorage.getItem("username") || "");
 
 /* --------------------------
    HELPERS
@@ -50,10 +79,11 @@ function computeRatings(list) {
     ratingCount.value = 0;
     return;
   }
+
   const vals = list
-    .map(f => f.valutazione ?? f.rating ?? f.val ?? f.score)
-    .map(v => typeof v === "string" ? Number(v) : v)
-    .filter(v => typeof v === "number" && !Number.isNaN(v));
+    .map(f => f.valutazione ?? f.rating)
+    .map(v => Number(v))
+    .filter(v => !Number.isNaN(v));
 
   if (!vals.length) {
     ratingAvg.value = 0;
@@ -66,12 +96,13 @@ function computeRatings(list) {
   ratingCount.value = vals.length;
 }
 
+
+
 /* --------------------------
-   FETCH TRAIL
+   LOAD TRAIL
 -------------------------- */
 const loadTrail = async () => {
   loading.value = true;
-  error.value = "";
   try {
     const res = await getTrailById(trailId);
     trail.value = res.data;
@@ -88,6 +119,12 @@ const loadTrail = async () => {
 -------------------------- */
 
 const loadFeedbacks = async () => {
+  if (!isLogged) {
+    feedbacks.value = [];
+    computeRatings([]);
+    return;
+  }
+
   try {
     const res = await getTrailFeedbacks(trailId);
     feedbacks.value = Array.isArray(res.data) ? res.data : [];
@@ -99,41 +136,70 @@ const loadFeedbacks = async () => {
   }
 };
 
+const canEditFeedback = (feedback) => {
+  if (!isLogged) return false;
+  if (isAdmin) return true;
+
+  const feedbackUserId =
+    feedback.idUser?._id ??
+    feedback.idUser;
+
+  return String(feedbackUserId) === String(userId);
+};
+
+const canDeleteFeedback = (feedback) => {
+  if (!isLogged) return false;
+  if (isAdmin) return true;
+
+  const feedbackUserId =
+    feedback.idUser?._id ??
+    feedback.idUser;
+
+  return String(feedbackUserId) === String(userId);
+};
+
+const startEditFeedback = (feedback) => {
+  editingFeedbackId.value = feedback._id ?? feedback.id;
+  editedCommentText.value =
+    feedback.testo ?? feedback.text ?? "";
+};
+
+const saveEditedFeedback = async (feedbackId) => {
+  try {
+    await updateFeedback(feedbackId, {
+      testo: editedCommentText.value
+    });
+
+    editingFeedbackId.value = null;
+    editedCommentText.value = "";
+    await loadFeedbacks();
+
+  } catch (err) {
+    console.error("Errore modifica commento", err);
+    alert("Errore modifica commento");
+  }
+};
+
 const removeFeedback = async (feedbackId) => {
   try {
     await deleteFeedback(feedbackId);
     await loadFeedbacks();
   } catch (err) {
     console.error("Errore eliminazione commento", err);
-    alert("Errore durante l'eliminazione del commento");
+    alert("Errore eliminazione commento");
   }
 };
 
-const canDeleteFeedback = (feedback, index) => {
-  if (!userId) return false;
-
-  // Admin può eliminare tutto
-  if (isAdmin) return true;
-
-  // Utente normale → solo il proprio (sempre il primo)
-  const feedbackUserId =
-    feedback.idUser?._id ??
-    feedback.idUser ??
-    feedback.userId;
-
-  return (
-    index === 0 &&
-    String(feedbackUserId) === String(userId)
-  );
+const setRating = (value) => {
+  selectedRating.value = value;
 };
 
-
-
-const setRating = (value) => selectedRating.value = value;
-
 const submitComment = async () => {
-  if (!userId) return alert("Devi essere loggato per commentare.");
-  if (!selectedRating.value) return alert("Devi selezionare una valutazione.");
+  if (!isLogged)
+    return alert("Devi essere loggato per commentare.");
+
+  if (!selectedRating.value)
+    return alert("Seleziona una valutazione.");
 
   try {
     await createFeedback(trailId, {
@@ -145,10 +211,10 @@ const submitComment = async () => {
 
     newComment.value = "";
     selectedRating.value = 0;
-    await loadFeedbacks();
 
+    await loadFeedbacks();
   } catch (err) {
-    console.error(err.response?.data || err);
+    console.error(err);
     alert("Errore invio commento");
   }
 };
@@ -156,204 +222,162 @@ const submitComment = async () => {
 /* --------------------------
    FAVOURITES
 -------------------------- */
+
 const checkIsFavourite = async () => {
   if (!userId) {
     isFav.value = false;
     return;
   }
-  checkingFav.value = true;
+
   try {
     const res = await getFavourites(userId);
 
-    const normalize = (payload) => {
-      if (!payload) return [];
-      if (Array.isArray(payload)) return payload;
-      if (Array.isArray(payload.favourites)) return payload.favourites;
-      if (Array.isArray(payload.data)) return payload.data;
-      if (payload.user && Array.isArray(payload.user.favourites)) return payload.user.favourites;
-      if (typeof payload === "object") {
-        const vals = Object.values(payload).filter(v => Array.isArray(v)).flat();
-        if (vals.length) return vals;
-      }
-      return [];
-    };
+    const favourites = Array.isArray(res.data?.favourites)
+      ? res.data.favourites
+      : [];
 
-    const data = normalize(res.data);
+    isFav.value = favourites.some(f =>
+      String(f._id ?? f.id) === String(trailId)
+    );
 
-    const found = data.some(item => {
-      if (!item) return false;
-      if (typeof item === "string" || typeof item === "number") return String(item) === String(trailId);
-      if (item._id) return String(item._id) === String(trailId);
-      if (item.id) return String(item.id) === String(trailId);
-      return false;
-    });
-
-    isFav.value = found;
   } catch (err) {
-    console.error("Errore getFavourites", err);
+    console.error("Errore check favourite:", err);
     isFav.value = false;
-  } finally {
-    checkingFav.value = false;
   }
 };
 
+
 const toggleFavourite = async () => {
-  if (!userId) return alert("Devi essere loggato per aggiungere ai preferiti.");
+  if (!userId)
+    return alert("Devi essere loggato.");
+
   try {
     if (!isFav.value) {
       await addFavourite(userId, trailId);
-      isFav.value = true;
     } else {
       await removeFavourite(userId, trailId);
-      isFav.value = false;
     }
+
+    // sincronizza stato reale
+    await checkIsFavourite();
+
   } catch (err) {
-    console.error("Errore toggleFavourite", err);
-    alert("Errore durante l'operazione sui preferiti.");
+    console.error("Errore toggle favourite:", err);
   }
 };
 
-/* --------------------------
-   GPX & SHARE
--------------------------- */
-const gpPopupMessage = ref("");     // messaggio da mostrare nel popup
-const gpPopupVisible = ref(false);
-
-const showGPPopup = (msg) => {
-  gpPopupMessage.value = msg;
-  gpPopupVisible.value = true;
-  setTimeout(() => (gpPopupVisible.value = false), 1800);
-};
-
-const downloadFileFromBlob = (blobOrData, filename, mime = "application/gpx+xml") => {
-  const blob = blobOrData instanceof Blob ? blobOrData : new Blob([blobOrData], { type: mime });
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  window.URL.revokeObjectURL(url);
-};
-
-const downloadGPX = async () => {
-  const safeTitle = (trail.value?.title ?? "track")
-    .replace(/\s+/g, "_")
-    .replace(/[^\w.-]/g, "");
-  const filename = `${safeTitle}.gpx`;
-
-  // 1) prova endpoint /download/gpx (blob)
-  try {
-    const res = await apiDownloadGPX(trailId); // responseType: blob
-    if (res?.data) {
-      downloadFileFromBlob(res.data, filename);
-      showGPPopup("GPX scaricato!");
-      return;
-    }
-  } catch (err) {
-    // log dettagli per debug
-    console.warn("download/gpx fallito:", err.response?.status, err.response?.data || err.message);
-    // se l'errore NON è 404 possiamo comunque provare il fallback,
-    // ma mettiamo il dettaglio nel log e continuiamo
-  }
-
-  // 2) fallback: prova /gpx (testo)
-  try {
-    const resText = await apiGetGPX(trailId); // responseType: text
-    const text = resText?.data;
-    if (text) {
-      downloadFileFromBlob(text, filename, "application/gpx+xml");
-      showGPPopup("GPX scaricato (via testo)!");
-      return;
-    } else {
-      console.warn("/gpx ha risposto ma senza testo:", resText);
-    }
-  } catch (err) {
-    console.warn("GET /gpx fallito:", err.response?.status, err.response?.data || err.message);
-  }
-
-  // 3) se siamo qui, fallimento completo
-  showGPPopup("Errore: impossibile scaricare il GPX");
-  console.error("Scaricamento GPX fallito per trailId:", trailId);
-};
-
-
-
-
-const showSharePopup = ref(false);
-
-const shareTrack = async () => {
-  try {
-    const url = window.location.href;
-
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(url);
-    } else {
-      const input = document.createElement("input");
-      input.value = url;
-      document.body.appendChild(input);
-      input.select();
-      document.execCommand("copy");
-      input.remove();
-    }
-
-    showSharePopup.value = true;
-
-    setTimeout(() => {
-      showSharePopup.value = false;
-    }, 1000);
-
-  } catch (err) {
-    console.error("Errore copia:", err);
-  }
-};
-
-
-/* --------------------------
-   MAP CENTER
--------------------------- */
-const mapCenter = computed(() => {
-  if (!trail.value?.location?.coordinates) return null;
-  return {
-    lat: trail.value.location.coordinates[1],
-    lon: trail.value.location.coordinates[0]
-  };
-});
-
-/* --------------------------
-   INIT
--------------------------- */
-onMounted(async () => {
-  await loadTrail();
-  await checkIsFavourite();
-  await loadFeedbacks();
-  loadReports();
-});
 
 /* --------------------------
    REPORTS
 -------------------------- */
+
 const reports = ref([]);
 const newReport = ref("");
+const editingReportId = ref(null);
+const editedReportText = ref("");
 
 const loadReports = async () => {
+  if (!isLogged) {
+    reports.value = [];
+    return;
+  }
+
   try {
     const res = await getTrailReports(trailId);
     reports.value = Array.isArray(res.data) ? res.data : [];
   } catch (err) {
-    console.error("Errore caricamento segnalazioni", err);
+    console.error(err);
     reports.value = [];
   }
 };
 
+const canEditReport = (report) => {
+  if (!isLogged) return false;
+  if (isAdmin) return true;
+
+  const reportUserId =
+    report.idUser?._id ??
+    report.idUser;
+
+  return String(reportUserId) === String(userId)
+    && report.state === "Nuovo";
+};
+
+const canDeleteReport = (report) => {
+  if (!isLogged) return false;
+  if (isAdmin) return true;
+
+  const reportUserId =
+    report.idUser?._id ??
+    report.idUser;
+
+  return String(reportUserId) === String(userId);
+};
+
+const startEditReport = (report) => {
+  editingReportId.value = report._id;
+  editedReportText.value = report.testo ?? "";
+};
+
+// aggiorna lo stato del report: PUT -> GET by id -> aggiorna l'elemento nell'array
+const updateReportState = async (reportId, newState) => {
+  try {
+    // 1) PUT per aggiornare solo il campo state
+    await updateReport(reportId, { state: newState });
+
+    // 2) GET by id per ottenere il report aggiornato dal backend
+    const res = await getReportById(reportId);
+    const updatedReport = res.data;
+
+    // 3) update "reactive" dell'array reports in-place (così Vue aggiorna UI subito)
+    const idx = reports.value.findIndex(r => String(r._id ?? r.id) === String(reportId));
+    if (idx !== -1) {
+      // sostituisci l'elemento esistente (mantieni reattività)
+      reports.value.splice(idx, 1, updatedReport);
+    } else {
+      // se per qualche motivo non esiste nell'array, lo aggiungiamo
+      reports.value.push(updatedReport);
+    }
+  } catch (err) {
+    console.error("Errore aggiornamento stato report:", err);
+    alert("Errore durante l'aggiornamento dello stato della segnalazione.");
+  }
+};
+
+const saveEditedReport = async (reportId) => {
+  try {
+    await updateReport(reportId, {
+      testo: editedReportText.value
+    });
+
+    editingReportId.value = null;
+    editedReportText.value = "";
+    await loadReports();
+
+  } catch (err) {
+    console.error(err);
+  }
+};
+
+const removeReport = async (reportId) => {
+  try {
+    await deleteReport(reportId);
+    await loadReports();
+  } catch (err) {
+    console.error(err);
+  }
+};
+
 const submitReport = async () => {
-  if (!userId) return alert("Devi essere loggato per segnalare.");
-  if (!newReport.value.trim()) return;
+  if (!isLogged)
+    return alert("Devi essere loggato.");
+
+  if (!newReport.value.trim())
+    return;
 
   try {
     await createReport(trailId, {
-      idTrail: trailId,   // richiesto doppio inserimento
+      idTrail: trailId,
       idUser: userId,
       testo: newReport.value
     });
@@ -363,34 +387,23 @@ const submitReport = async () => {
 
   } catch (err) {
     console.error(err);
-    alert("Errore invio segnalazione");
   }
 };
 
-const removeReport = async (reportId) => {
-  try {
-    await deleteReport(reportId);
-    await loadReports();
-  } catch (err) {
-    console.error("Errore eliminazione report", err);
-    alert("Errore durante l'eliminazione della segnalazione");
-  }
-};
 
-const canDeleteReport = (report, index) => {
-  if (!userId) return false;
 
-  if (isAdmin) return true;
+/* --------------------------
+   MAP
+-------------------------- */
+const mapCenter = computed(() => {
+  if (!trail.value?.location?.coordinates)
+    return null;
 
-  const reportUserId =
-    report.idUser?._id ??
-    report.idUser;
-
-  return (
-    index === 0 &&
-    String(reportUserId) === String(userId)
-  );
-};
+  return {
+    lat: trail.value.location.coordinates[1],
+    lon: trail.value.location.coordinates[0]
+  };
+});
 
 const exportPDF = async () => {
   if (!trail.value) return alert("Nessun sentiero caricato");
@@ -633,18 +646,127 @@ const exportPDF = async () => {
   doc.save(`${safeTitle}.pdf`);
 };
 
+/* --------------------------
+   GPX & SHARE
+-------------------------- */
+const gpPopupMessage = ref("");     // messaggio da mostrare nel popup
+const gpPopupVisible = ref(false);
+
+const showGPPopup = (msg) => {
+  gpPopupMessage.value = msg;
+  gpPopupVisible.value = true;
+  setTimeout(() => (gpPopupVisible.value = false), 1800);
+};
+
+const downloadFileFromBlob = (blobOrData, filename, mime = "application/gpx+xml") => {
+  const blob = blobOrData instanceof Blob ? blobOrData : new Blob([blobOrData], { type: mime });
+  const url = window.URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  window.URL.revokeObjectURL(url);
+};
+
+const downloadGPX = async () => {
+  const safeTitle = (trail.value?.title ?? "track")
+    .replace(/\s+/g, "_")
+    .replace(/[^\w.-]/g, "");
+  const filename = `${safeTitle}.gpx`;
+
+  // 1) prova endpoint /download/gpx (blob)
+  try {
+    const res = await apiDownloadGPX(trailId); // responseType: blob
+    if (res?.data) {
+      downloadFileFromBlob(res.data, filename);
+      showGPPopup("GPX scaricato!");
+      return;
+    }
+  } catch (err) {
+    // log dettagli per debug
+    console.warn("download/gpx fallito:", err.response?.status, err.response?.data || err.message);
+    // se l'errore NON è 404 possiamo comunque provare il fallback,
+    // ma mettiamo il dettaglio nel log e continuiamo
+  }
+
+  // 2) fallback: prova /gpx (testo)
+  try {
+    const resText = await apiGetGPX(trailId); // responseType: text
+    const text = resText?.data;
+    if (text) {
+      downloadFileFromBlob(text, filename, "application/gpx+xml");
+      showGPPopup("GPX scaricato (via testo)!");
+      return;
+    } else {
+      console.warn("/gpx ha risposto ma senza testo:", resText);
+    }
+  } catch (err) {
+    console.warn("GET /gpx fallito:", err.response?.status, err.response?.data || err.message);
+  }
+
+  // 3) se siamo qui, fallimento completo
+  showGPPopup("Errore: impossibile scaricare il GPX");
+  console.error("Scaricamento GPX fallito per trailId:", trailId);
+};
+
+const showSharePopup = ref(false);
+
+const shareTrack = async () => {
+  try {
+    const url = window.location.href;
+
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(url);
+    } else {
+      const input = document.createElement("input");
+      input.value = url;
+      document.body.appendChild(input);
+      input.select();
+      document.execCommand("copy");
+      input.remove();
+    }
+
+    showSharePopup.value = true;
+
+    setTimeout(() => {
+      showSharePopup.value = false;
+    }, 1000);
+
+  } catch (err) {
+    console.error("Errore copia:", err);
+  }
+};
+
+
+
+/* --------------------------
+   INIT
+-------------------------- */
+
+onMounted(async () => {
+  await loadTrail();
+  await checkIsFavourite();
+
+  if (isLogged) {
+    await loadFeedbacks();
+    await loadReports();
+  }
+});
 
 
 </script>
 
 <template>
   <div class="track-details-page">
+
     <!-- HEADER -->
     <header class="header">
       <div class="header-left">
         <template v-if="isAdmin">
+         <router-link to="/admin" class="nav-btn">AdminInfo</router-link>
           <router-link to="/new-track" class="nav-btn">NewTrack</router-link>
-          <router-link to="/admin" class="nav-btn">AdminInfo</router-link>
           <router-link to="/statistics" class="nav-btn">Statistiche</router-link>
         </template>
       </div>
@@ -655,6 +777,7 @@ const exportPDF = async () => {
 
       <div class="header-right">
         <router-link to="/" class="nav-btn">Home</router-link>
+        <div class="user-info"><span class="username-box">👤 {{ username }}</span></div>
         <router-link v-if="showProfile" to="/profile" class="nav-btn">Profilo</router-link>
         <router-link v-else to="/login" class="nav-btn">Login</router-link>
       </div>
@@ -665,18 +788,29 @@ const exportPDF = async () => {
       <div v-else-if="error" class="center error">{{ error }}</div>
 
       <div v-else-if="trail" class="content-box">
+
         <!-- LEFT COLUMN -->
         <section class="left">
+
+          <!-- TITLE -->
           <div class="title-row">
-            <button class="icon-btn fav" :class="{ active: isFav }" @click="toggleFavourite" title="Aggiungi/Rimuovi dai preferiti">
-              <span v-if="isFav">★</span><span v-else>☆</span>
+            <button
+              class="icon-btn fav"
+              :class="{ active: isFav }"
+              @click="toggleFavourite"
+            >
+              <span v-if="isFav">★</span>
+              <span v-else>☆</span>
             </button>
+
             <h1 class="title">{{ trail.title }}</h1>
             <button class="icon-btn" @click="exportPDF" title="Esporta PDF">📄</button>
           </div>
 
+          <!-- INFO -->
           <div class="info">
             <p v-if="trail.description">{{ trail.description }}</p>
+
             <div class="meta">
               <div><strong>Durata:</strong> {{ trail.duration?.hours ?? "-" }}h {{ trail.duration?.minutes ?? "-" }}m</div>
               <div><strong>Dislivello:</strong> {{ trail.ascentM ?? "-" }} m</div>
@@ -685,71 +819,132 @@ const exportPDF = async () => {
             </div>
           </div>
 
+          <!-- COMMENT SECTION -->
           <div class="section">
-            <h3>Galleria</h3>
-            <div class="gallery-placeholder">[Galleria immagini]</div>
-          </div>
-
-          <div class="section">
-            <h3>Lascia un commento</h3>
-            <div class="stars">
-              <span v-for="n in 5" :key="n" class="star" :class="{ active: n <= (hoverRating || selectedRating) }" @click="setRating(n)" @mouseover="hoverRating=n" @mouseleave="hoverRating=0">★</span>
+           <h3>Lascia un commento</h3>
+          
+            <!-- NON LOGGED -->
+            <div v-if="!isLogged" class="no-reports">
+              Devi effettuare il login per commentare e visualizzare i commenti.
             </div>
-            <textarea v-model="newComment" placeholder="Scrivi qui il tuo commento..."></textarea>
-            <button class="small-btn" @click="submitComment">Invia commento</button>
-          </div>
-
-          <div class="section">
-            <h3>Commenti ({{ ratingCount }})</h3>
-            <div v-if="feedbacks.length===0">Nessun commento</div>
-            <div
-              v-for="(fb, index) in feedbacks"
-              :key="fb._id"
-              class="comment"
-            >
-              <div class="comment-meta">
-                <span>
-                 <strong>Utente:</strong>
-                 {{ fb.idUser?.username ?? "anon" }}
-                 <span v-if="fb.idUser?.email">
-                   ({{ fb.idUser.email }})
-                 </span>
-                </span>
-               
-                <span>
-                  <strong>Valutazione:</strong> {{ fb.valutazione ?? fb.rating ?? "-" }}
-                </span>
-               
-                <button
-                  v-if="canDeleteFeedback(fb, index)"
-                  class="delete-comment-btn"
-                  @click="removeFeedback(fb._id)"
-                  title="Elimina commento"
+            
+            <!-- LOGGED USERS -->
+            <template v-else>
+            
+              <!-- NEW COMMENT -->
+            
+              <div class="stars">
+                <span
+                  v-for="n in 5"
+                  :key="n"
+                  class="star"
+                  :class="{ active: n <= selectedRating }"
+                  @click="setRating(n)"
                 >
-                  🗑️
-                </button>
+                  ★
+                </span>
               </div>
              
-              <p class="comment-text">
-                {{ fb.testo ?? fb.text ?? fb.message ?? "" }}
-              </p>
-            </div>
-
+              <textarea
+                v-model="newComment"
+                placeholder="Scrivi qui il tuo commento..."
+              ></textarea>
+             
+              <button class="small-btn" @click="submitComment">
+                Invia commento
+              </button>
+             
+              <!-- COMMENTS LIST -->
+              <h3 style="margin-top:20px;">
+                Commenti ({{ ratingCount }})
+              </h3>
+             
+              <div v-if="feedbacks.length === 0">
+                Nessun commento
+              </div>
+             
+              <div
+                v-for="(fb, index) in feedbacks"
+                :key="fb._id ?? fb.id ?? index"
+                class="comment"
+              >
+             
+                <!-- META -->
+                <div class="comment-meta">
+                  <span>
+                    <strong>Utente:</strong>
+                    {{ fb.idUser?.username ?? "anon" }}
+                  </span>
+                 
+                  <span>
+                    <strong>Valutazione:</strong>
+                    {{ fb.valutazione ?? fb.rating ?? "-" }}
+                  </span>
+                 
+                  <div style="display:flex; gap:6px;">
+                    <!-- EDIT -->
+                    <button
+                      v-if="canEditFeedback(fb)"
+                      class="edit-report-btn"
+                      @click="startEditFeedback(fb)"
+                    >
+                      ✏️
+                    </button>
+                   
+                    <!-- DELETE -->
+                    <button
+                      v-if="canDeleteFeedback(fb)"
+                      class="delete-comment-btn"
+                      @click="removeFeedback(fb._id ?? fb.id)"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+               
+                <!-- EDIT MODE -->
+                <div v-if="editingFeedbackId === (fb._id ?? fb.id)">
+                  <textarea v-model="editedCommentText"></textarea>
+                  <button
+                    class="small-btn"
+                    @click="saveEditedFeedback(fb._id ?? fb.id)"
+                  >
+                    Salva
+                  </button>
+                </div>
+               
+                <!-- NORMAL VIEW -->
+                <p v-else class="comment-text">
+                  {{ fb.testo ?? fb.text ?? fb.message ?? "" }}
+                </p>
+               
+              </div>
+             
+            </template>
+           
           </div>
+
         </section>
 
         <!-- RIGHT COLUMN -->
         <section class="right">
+
+          <!-- MAP -->
           <div class="map-wrap">
-            <TrailMap v-if="mapCenter" :center="mapCenter" :zoom="14" />
+            <TrailMap
+              v-if="mapCenter"
+              :center="mapCenter"
+              :zoom="14"
+            />
           </div>
 
+          <!-- RATING -->
           <div class="actions-row">
-            <div class="rating">
+            <!-- mostra rating solo se l'utente è loggato -->
+            <div v-if="isLogged" class="rating">
               <div class="avg">{{ ratingAvg }} ★</div>
               <div class="count">({{ ratingCount }})</div>
             </div>
-
             <div class="icons">
               <button class="icon-action" @click="downloadGPX" title="Download GPX">⬇️</button>
             
@@ -769,54 +964,114 @@ const exportPDF = async () => {
               </div>         
             </div>
           </div>
-             <div class="reports-section">
-           <h3>Segnalazioni</h3>
 
-           <div class="report-input">
-             <textarea
-               v-model="newReport"
-               placeholder="Scrivi una segnalazione..."
-             ></textarea>
-             <button class="small-btn" @click="submitReport">
-               Invia segnalazione
-             </button>
-           </div>
-          
-           <div v-if="reports.length === 0" class="no-reports">
-             Nessuna segnalazione
-           </div>
-          
-           <div
-             v-for="(rep, index) in reports"
-             :key="rep._id"
-             class="report"
-           >
-             <div class="report-meta">
-               <span><strong>Utente:</strong>
-               {{ rep.idUser?.username ?? "anon" }}
-               <span v-if="rep.idUser?.email">
-                 ({{ rep.idUser.email }})
-               </span>
-               </span>
-             
-               <button
-                 v-if="canDeleteReport(rep, index)"
-                 class="delete-report-btn"
-                 @click="removeReport(rep._id)"
-                 title="Elimina segnalazione"
-               >
-                 🗑️
-               </button>
-             </div>
-            
-             <p class="report-text">
-               {{ rep.testo ?? rep.text ?? rep.message ?? "" }}
-             </p>
-           </div>
+          <!-- REPORTS -->
+          <div class="reports-section">
+            <h3>Segnalazioni</h3>
 
-         </div>
+            <div v-if="!isLogged" class="no-reports">
+              Devi effettuare il login per visualizzare o inviare segnalazioni.
+            </div>
+
+            <template v-else>
+
+              <!-- NEW REPORT -->
+              <div class="report-input">
+                <textarea
+                  v-model="newReport"
+                  placeholder="Scrivi una segnalazione..."
+                ></textarea>
+
+                <button class="small-btn" @click="submitReport">
+                  Invia segnalazione
+                </button>
+              </div>
+
+              <div v-if="reports.length === 0" class="no-reports">
+                Nessuna segnalazione
+              </div>
+
+              <div
+                v-for="(rep, index) in reports"
+                :key="rep._id ?? rep.id ?? index"
+                class="report"
+              >
+               <!-- Stato segnalazione: admin = bottoni cliccabili, utenti = badge -->
+               <div v-if="isAdmin" class="report-states">
+                 <button
+                   class="state-box"
+                   :class="{ active: (rep.state === 'Nuovo') }"
+                   @click="updateReportState(rep._id ?? rep.id, 'Nuovo')"
+                 >Nuovo</button>
+               
+                 <button
+                   class="state-box"
+                   :class="{ active: (rep.state === 'In progresso') }"
+                   @click="updateReportState(rep._id ?? rep.id, 'In progresso')"
+                 >In progresso</button>
+               
+                 <button
+                   class="state-box"
+                   :class="{ active: (rep.state === 'Risolto') }"
+                   @click="updateReportState(rep._id ?? rep.id, 'Risolto')"
+                 >Risolto</button>
+               </div>
+
+               <!-- Per utenti non-admin, mostra semplicemente lo stato (badge) -->
+               <div v-else class="state-badge">
+                 {{ rep.state }}
+               </div>
+
+                <!-- META -->
+                <div class="report-meta">
+                 
+                  <span>
+                    <strong>Utente:</strong>
+                    {{ rep.idUser?.username ?? "anon" }}
+                  </span>
+
+                  <div class="report-actions">
+                    <button
+                      v-if="canEditReport(rep)"
+                      class="edit-report-btn"
+                      @click="startEditReport(rep)"
+                    >
+                      ✏️
+                    </button>
+
+                    <button
+                      v-if="canDeleteReport(rep)"
+                      class="delete-report-btn"
+                      @click="removeReport(rep._id ?? rep.id)"
+                    >
+                      🗑️
+                    </button>
+                  </div>
+                </div>
+
+                <!-- EDIT MODE -->
+                <div v-if="editingReportId === (rep._id ?? rep.id)">
+                  <textarea v-model="editedReportText"></textarea>
+                  <button
+                    class="small-btn"
+                    @click="saveEditedReport(rep._id ?? rep.id)"
+                  >
+                    Salva
+                  </button>
+                </div>
+
+                <!-- NORMAL VIEW -->
+                <p v-else class="report-text">
+                  {{ rep.testo ?? rep.text ?? "" }}
+                </p>
+
+              </div>
+
+            </template>
+          </div>
 
         </section>
+
       </div>
     </main>
   </div>
@@ -831,6 +1086,7 @@ const exportPDF = async () => {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
 }
 
+
 .comment-meta {
   display: flex;
   justify-content: space-between;
@@ -840,11 +1096,57 @@ const exportPDF = async () => {
   color: #333;
 }
 
+.report-states {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.state-box {
+  padding: 4px 10px;
+  border: 1px solid #ccc;
+  cursor: pointer;
+  font-size: 0.8rem;
+  background: #f5f5f5;
+  transition: 0.2s;
+}
+
+.state-badge {
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: #f0f0f0;
+  font-size: 0.85rem;
+  display: inline-block;
+  color: #333;
+}
+
+.state-box.active {
+  background: #2c7be5;
+  color: white;
+  border-color: #2c7be5;
+}
+
+.report-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.edit-report-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+  opacity: 0.7;
+  transition: 0.2s;
+}
+
 .delete-comment-btn {
   background: none;
   border: none;
   cursor: pointer;
   font-size: 1rem;
+  opacity: 0.7;
+  transition: 0.2s;
 }
 
 
@@ -861,14 +1163,34 @@ const exportPDF = async () => {
   resize: vertical;
 }
 
-.report {
-  border-top: 1px solid #eee;
-  padding: 8px 0;
+textarea {
+  width: 100%;
+  min-height: 80px;
+  resize: vertical;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-family: inherit;
+  font-size: 0.9rem;
+  box-sizing: border-box;
 }
 
+.report {
+  border: 1px solid #e6e6e6;
+  border-radius: 8px;
+  padding: 10px;
+  margin-top: 10px;
+  background: #f9f9f9;
+}
+
+
 .report-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   font-size: 0.85rem;
-  color: #444;
+  color: #555;
+  margin-bottom: 6px;
 }
 
 .report-text {
@@ -877,8 +1199,11 @@ const exportPDF = async () => {
 
 .no-reports {
   font-size: 0.9rem;
-  color: #666;
-  margin-top: 6px;
+  color: #777;
+  margin-top: 8px;
+  padding: 8px;
+  background: #f5f5f5;
+  border-radius: 6px;
 }
 
 .report-meta {
@@ -894,6 +1219,8 @@ const exportPDF = async () => {
   border: none;
   cursor: pointer;
   font-size: 1rem;
+  opacity: 0.7;
+  transition: 0.2s;
 }
 
 .header {
@@ -939,10 +1266,12 @@ const exportPDF = async () => {
 .content-box {
   display: flex;
   gap: 24px;
-  border: 1px solid #ccc;
-  padding: 16px;
+  border: 1px solid #ddd;
+  border-radius: 12px;
+  padding: 20px;
   box-sizing: border-box;
   min-height: 100%;
+  background: white;
 }
 
 /* left / right */
@@ -950,6 +1279,17 @@ const exportPDF = async () => {
   flex: 1;
   overflow-y: auto;
   padding-right: 8px;
+}
+
+.edit-report-btn:hover {
+  opacity: 1;
+  color: #2c7be5;
+}
+
+.delete-comment-btn:hover,
+.delete-report-btn:hover {
+  opacity: 1;
+  color: #e55353;
 }
 
 .right {
@@ -1029,19 +1369,26 @@ const exportPDF = async () => {
 }
 
 .comment {
-  border-top: 1px solid #eee;
-  padding: 8px 0;
+  border: 1px solid #e6e6e6;
+  border-radius: 8px;
+  padding: 10px;
+  margin-top: 10px;
+  background: #fafafa;
 }
 
 .comment-meta {
-  display:flex;
-  gap:12px;
-  font-size: 0.9rem;
-  color: #333;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.85rem;
+  color: #555;
+  margin-bottom: 6px;
 }
 
 .comment-text {
-  margin: 8px 0 0;
+  margin: 4px 0 0;
+  line-height: 1.4;
 }
 
 /* map */
@@ -1121,12 +1468,20 @@ const exportPDF = async () => {
 /* small button */
 .small-btn {
   margin-top: 6px;
-  padding: 6px 10px;
+  padding: 6px 12px;
   border-radius: 6px;
-  border: 1px solid #ccc;
-  background: #fff;
+  border: none;
+  background: #2c7be5;
+  color: white;
   cursor: pointer;
+  font-size: 0.85rem;
+  transition: 0.2s;
 }
+
+.small-btn:hover {
+  background: #1f63c7;
+}
+
 
 /* misc */
 .error {

@@ -1,79 +1,199 @@
 <script setup>
 import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { getUserById } from "../services/userService";
+import dayjs from "dayjs";
 
 /* =========================
-   ADMIN GUARD
+   SERVICES
+   ========================= */
+import { getTrails } from "../services/trailService";
+import { getUsers, getFavourites } from "../services/userService";
+import { getAllReports } from "../services/reportService";
+import { getAllFeedbacks } from "../services/feedbackService";
+
+/* =========================
+   AUTH / ADMIN GUARD
    ========================= */
 const router = useRouter();
+const username = ref(localStorage.getItem("username") || "");
+const userId = localStorage.getItem("userId");
+const isAdmin = localStorage.getItem("isAdmin");
 
 const isAuthorized = ref(false);
 const authError = ref("");
 
-const checkAdminAccess = async () => {
-  const token = localStorage.getItem("token");
-  const userId = localStorage.getItem("userId");
-  const isAdmin = localStorage.getItem("isAdmin");
-
-  if (!token || !userId) {
+const checkAdminAccess = () => {
+  if (!userId || !localStorage.getItem("token")) {
     authError.value = "Devi essere loggato per accedere a questa pagina.";
     return;
   }
-
   if (isAdmin !== "true") {
     authError.value = "Accesso negato: permessi amministratore richiesti.";
     return;
   }
-
   isAuthorized.value = true;
 };
 
-onMounted(checkAdminAccess);
-
 /* =========================
-   STATISTICHE MOCK
+   STATISTICHE
    ========================= */
 const stats = ref({
-  totalRoutes: 124,
-  createdMonth: 12,
-  modifiedMonth: 8,
-  users: 342,
-  usersMonth: 27,
-  avgRating: 4,
-  gpxPercent: 68,
-  photoPercent: 82
+  totalRoutes: 0,
+  createdMonth: 0,
+  modifiedMonth: 0,
+  users: 0,
+  usersMonth: 0,
+  avgRating: 0,
+  gpxPercent: 0,
+  photoPercent: 0
 });
 
-const mostCommented = ref([
-  "Sentiero delle Aquile",
-  "Anello del Bosco",
-  "Percorso del Lago",
-  "Trail Panoramico"
-]);
+const mostCommented = ref([]);
+const mostViewed = ref([]);
+const mostReported = ref([]);
+const tags = ref([]);
 
-const mostViewed = ref([
-  "Dolomiti Trail",
-  "Sentiero Storico",
-  "Percorso Cascata",
-  "Anello Alpino"
-]);
+/* =========================
+   LOAD STATISTICHE
+   ========================= */
+const unwrap = (res) => {
+  // normalizza le risposte axios / oggetti vari in un array
+  if (!res) return [];
+  if (Array.isArray(res)) return res;
+  const d = res.data ?? res;
+  if (Array.isArray(d)) return d;
+  // cerca la prima proprietà che sia un array (es. { users: [...] } )
+  const arr = Object.values(d).find(v => Array.isArray(v));
+  return Array.isArray(arr) ? arr : [];
+};
 
-const mostReported = ref([
-  "Sentiero Innevato",
-  "Percorso Frana",
-  "Trail Chiuso",
-  "Sentiero Ripido"
-]);
+const loadStatistics = async () => {
+  try {
+    // 1) TRAILS (sempre prima, ci servono per tag/mostViewed)
+    const trailsRes = await getTrails();
+    const trailsData = unwrap(trailsRes);
+    stats.value.totalRoutes = trailsData.length;
 
-const tags = ref([
-  "Panoramico",
-  "Lago",
-  "Famiglia",
-  "Trekking",
-  "Storico",
-  "MTB"
-]);
+    // tag più usati
+    const tagCount = {};
+    trailsData.forEach(t => t.tags?.forEach(tag => {
+      tagCount[tag] = (tagCount[tag] || 0) + 1;
+    }));
+    tags.value = Object.entries(tagCount)
+      .sort((a,b) => b[1]-a[1])
+      .slice(0,6)
+      .map(([tag]) => tag);
+
+    // most viewed (NON mutiamo trailsData: facciamo slice())
+    mostViewed.value = trailsData
+      .slice()
+      .sort((a,b) => (b.views || 0) - (a.views || 0))
+      .slice(0,4)
+      .map(t => t.title || t.name || t._id);
+
+    const lastMonth = dayjs().subtract(1, "month");
+
+    stats.value.createdMonth = trailsData.filter(t =>
+      t.createdAt && dayjs(t.createdAt).isAfter(lastMonth)
+    ).length;
+
+    stats.value.modifiedMonth = trailsData.filter(t =>
+      t.updatedAt && dayjs(t.updatedAt).isAfter(lastMonth)
+    ).length;
+
+    const trailsWithGPX = trailsData.filter(t => t.gpxFile).length;
+    stats.value.gpxPercent = trailsData.length ? Math.round((trailsWithGPX / trailsData.length) * 100) : 0;
+
+    const trailsWithPhotos = trailsData.filter(t => (t.photos?.length || 0) > 0).length;
+    stats.value.photoPercent = trailsData.length ? Math.round((trailsWithPhotos / trailsData.length) * 100) : 0;
+
+    // 2) Carichiamo in parallelo users, feedbacks, reports
+    const [usersRes, feedbackRes, reportsRes] = await Promise.all([
+      getUsers().catch(e => { console.warn("getUsers error", e); return null; }),
+      getAllFeedbacks().catch(e => { console.warn("getAllFeedbacks error", e); return null; }),
+      getAllReports().catch(e => { console.warn("getAllReports error", e); return null; })
+    ]);
+
+    const usersData = unwrap(usersRes);
+    const feedbackData = unwrap(feedbackRes);
+    const reportsData = unwrap(reportsRes);
+
+    stats.value.users = usersData.length;
+    stats.value.usersMonth = usersData.filter(u => u.createdAt && dayjs(u.createdAt).isAfter(lastMonth)).length;
+
+    // feedback: media e conteggio per trail
+    stats.value.avgRating = feedbackData.length
+      ? Math.round(feedbackData.reduce((sum,f) => sum + (Number(f.valutazione) || 0), 0) / feedbackData.length)
+      : 0;
+
+    const feedbackCount = {};
+    feedbackData.forEach(f => {
+      const idTrail = f.idTrail?._id || f.idTrail; // populate -> idTrail è oggetto
+      if (!idTrail) return;
+      feedbackCount[idTrail] = (feedbackCount[idTrail] || 0) + 1;
+    });
+    mostCommented.value = Object.entries(feedbackCount)
+      .sort((a,b) => b[1]-a[1])
+      .slice(0,4)
+      .map(([trailId]) => {
+        const t = trailsData.find(tr => tr._id === trailId || tr.id === trailId);
+        return t?.title || t?.name || trailId;
+      });
+
+
+    // reports: conteggio per trail
+    const reportCount = {};
+    reportsData.forEach(r => {
+      const idTrail = r.idTrail ?? r.trailId ?? r.trail;
+      if (!idTrail) return;
+      reportCount[idTrail] = (reportCount[idTrail] || 0) + 1;
+    });
+    mostReported.value = Object.entries(reportCount)
+      .sort((a,b) => b[1]-a[1])
+      .slice(0,4)
+      .map(([trailId]) => {
+        const t = trailsData.find(tr => tr._id === trailId || tr.id === trailId);
+        return t?.title || t?.name || trailId;
+      });
+
+    // 3) SENTIERI INTERAGITI: feedback OR report OR preferiti
+    // Recuperiamo preferiti per ogni utente (ma non falliamo se qualche chiamata va in errore)
+    const favPromises = usersData.map(u => getFavourites(u._id).catch(e => { console.warn("fav error for user", u._id, e); return null; }));
+    const favResults = await Promise.all(favPromises);
+
+    // normalizziamo gli id dei trail preferiti
+    const favTrailIds = new Set();
+    favResults.forEach(res => {
+      const list = unwrap(res); // array di oggetti (spesso sono i trail)
+      list.forEach(item => {
+        // prova varie proprietà possibili per ricavare l'id del trail
+        const tid = item.idTrail ?? item._id ?? item.id ?? item.trailId;
+        if (tid) favTrailIds.add(tid);
+        // se l'API ritorna direttamente i trail (es. { _id, title }), usiamo _id
+        else if (item._id) favTrailIds.add(item._id);
+      });
+    });
+
+    const interagitiSet = new Set();
+    trailsData.forEach(t => {
+      const id = t._id ?? t.id;
+      if (!id) return;
+      if (feedbackCount[id] || reportCount[id] || favTrailIds.has(id)) interagitiSet.add(id);
+    });
+    stats.value.interactedPercent = trailsData.length ? Math.round((interagitiSet.size / trailsData.length) * 100) : 0;
+
+  } catch (e) {
+    console.error("Errore caricamento statistiche:", e);
+  }
+};
+
+/* =========================
+   INIT
+   ========================= */
+onMounted(() => {
+  checkAdminAccess();
+  if(isAuthorized.value) loadStatistics();
+});
 </script>
 
 <template>
@@ -95,8 +215,9 @@ const tags = ref([
       <!-- HEADER -->
       <header class="header">
         <div class="header-left">
+          <router-link to="/admin" class="nav-btn">AdminInfo</router-link>
           <router-link to="/new-track" class="nav-btn">New Track</router-link>
-        </div>
+         </div>
 
         <div class="header-center">
           <img src="../assets/goon_logo.png" class="logo" alt="GO-ON Logo" />
@@ -104,13 +225,13 @@ const tags = ref([
 
         <div class="header-right">
           <router-link to="/" class="nav-btn">Home</router-link>
+          <div class="user-info"><span class="username-box">👤 {{ username }}</span></div>
           <router-link to="/profile" class="nav-btn">Profilo</router-link>
         </div>
       </header>
 
       <!-- GRID -->
       <main class="grid">
-
         <!-- STATISTICHE GENERALI -->
         <div class="card">
           <div class="row"><span>Total Routes</span><span>{{ stats.totalRoutes }}</span></div>
@@ -166,26 +287,25 @@ const tags = ref([
           </div>
         </div>
 
-        <!-- SENTIERI CON FOTO -->
+        <!-- SENTIERI INTERAGITI -->
         <div class="card center">
-          <h3>Sentieri con foto</h3>
-          <div class="pie">{{ stats.photoPercent }}%</div>
+          <h3>Sentieri interagiti</h3>
+          <div class="pie">{{ stats.interactedPercent }}%</div>
         </div>
 
-      </main>
 
+      </main>
     </div>
   </div>
 </template>
 
 <style scoped>
 .stats-page {
-  height: 100vh;
   display: flex;
   flex-direction: column;
+  padding: 16px;
 }
 
-/* HEADER */
 .header {
   height: 80px;
   display: grid;
@@ -199,12 +319,6 @@ const tags = ref([
   height: 50px;
 }
 
-.header-left,
-.header-right {
-  display: flex;
-  gap: 12px;
-}
-
 .nav-btn {
   text-decoration: none;
   padding: 6px 12px;
@@ -213,57 +327,45 @@ const tags = ref([
   border-radius: 6px;
 }
 
-/* GRID */
 .grid {
-  flex: 1;
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  grid-template-rows: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fill,minmax(200px,1fr));
   gap: 16px;
-  padding: 16px;
+  margin-top: 24px;
+}
+
+.header-right {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+.header-left {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-start;
 }
 
 .card {
-  border: 1px solid #ddd;
+  border: 1px solid #ccc;
   padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+  background: #fafafa;
 }
 
 .center {
-  align-items: center;
-  justify-content: center;
   text-align: center;
 }
 
 .row {
   display: flex;
   justify-content: space-between;
+  margin: 4px 0;
 }
 
 .stars {
-  font-size: 32px;
+  font-size: 1.2rem;
 }
 
-/* Fake pie chart */
-.pie {
-  width: 120px;
-  height: 120px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-}
-
-/* Inputs */
-input {
-  text-align: center;
-  padding: 6px;
-}
-
-/* Tags */
 .tags {
   display: flex;
   flex-wrap: wrap;
@@ -271,27 +373,31 @@ input {
 }
 
 .tags span {
-  padding: 4px 8px;
-  background: #eee;
+  background: #2c7be5;
+  color: white;
+  padding: 4px 6px;
   border-radius: 4px;
 }
 
-/* Error */
+.pie {
+  font-size: 1.6rem;
+  font-weight: bold;
+  color: #2c7be5;
+}
+
 .auth-error {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
+  padding: 24px;
   text-align: center;
+  color: red;
 }
 
 .back-btn {
-  margin-top: 16px;
-  padding: 8px 16px;
+  margin-top: 12px;
+  display: inline-block;
+  padding: 6px 12px;
   background: #2c7be5;
   color: white;
-  text-decoration: none;
   border-radius: 6px;
+  text-decoration: none;
 }
 </style>

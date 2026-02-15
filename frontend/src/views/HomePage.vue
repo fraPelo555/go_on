@@ -43,12 +43,6 @@ const checkAuth = async () => {
   }
 };
 
-onMounted(async () => {
-  await checkAuth();
-  await fetchTrails();
-  if (isLogged.value) await loadFavourites();
-});
-
 /* =========================
    TAG DINAMICI
 ========================= */
@@ -84,12 +78,13 @@ const fetchTrails = async () => {
     trails.value = data.map(trail => ({
       id: trail.id,
       title: trail.title,
-      description: trail.description || "Nessuna descrizione",
       difficulty: trail.difficulty,
       lengthLabel: `${trail.lengthKm} km`,
       durationLabel: `${trail.duration?.hours || 0}h ${trail.duration?.minutes || 0}m`,
       tags: trail.tags || [],
-      location: trail.location?.coordinates ? { lon: trail.location.coordinates[0], lat: trail.location.coordinates[1] } : null
+      location: trail.location?.coordinates
+        ? { lon: trail.location.coordinates[0], lat: trail.location.coordinates[1] }
+        : null
     }));
     visibleTrails.value = trails.value;
     fetchTags(trails.value);
@@ -105,7 +100,9 @@ const handleSearch = (event) => {
   searchText.value = event.target.value.toLowerCase();
   visibleTrails.value = trails.value.filter(t =>
     t.title.toLowerCase().includes(searchText.value) ||
-    t.description.toLowerCase().includes(searchText.value)
+    t.tags.some(tag =>
+      tag.toLowerCase().includes(searchText.value)
+    )
   );
 };
 
@@ -204,6 +201,12 @@ const applyNearbyFilter = async () => {
     fetchTags(visibleTrails.value);
   } catch(err){ console.error(err); }
 };
+
+onMounted(async () => {
+  await checkAuth();
+  await fetchTrails();
+  if (isLogged.value) await loadFavourites();
+});
 </script>
 
 <template>
@@ -212,12 +215,12 @@ const applyNearbyFilter = async () => {
   <!-- HEADER -->
   <header class="header">
     <div class="header-left">
+     <router-link v-if="isAdmin" to="/admin" class="login-btn">AdminInfo</router-link>
       <router-link v-if="isAdmin" to="/new-track" class="login-btn">NewTrack</router-link>
       <router-link v-if="isAdmin" to="/statistics" class="login-btn">Statistics</router-link>
     </div>
     <div class="header-center"><img src="../assets/goon_logo.png" class="logo"/></div>
     <div class="header-right">
-      <router-link v-if="isAdmin" to="/admin" class="login-btn">AdminInfo</router-link>
       <div v-if="isLogged" class="user-info"><span class="username-box">👤 {{ username }}</span></div>
       <router-link v-if="!isLogged" to="/login" class="login-btn">Login</router-link>
       <router-link v-else to="/profile" class="login-btn">Profile</router-link>
@@ -273,7 +276,15 @@ const applyNearbyFilter = async () => {
         <div v-for="trail in visibleTrails" :key="trail.id" class="trail-card">
           <router-link :to="`/tracks/${trail.id}`">
             <h4>{{ trail.title }}</h4>
-            <p>{{ trail.description }}</p>
+              <div class="trail-tags">
+                <span
+                  v-for="tag in trail.tags"
+                  :key="tag"
+                  class="tag-pill"
+                >
+                  {{ tag.replaceAll('_',' ') }}
+                </span>
+              </div>
             <div class="trail-meta">
               <span>{{ trail.lengthLabel }}</span>
               <span>{{ trail.durationLabel }}</span>
@@ -467,6 +478,23 @@ const applyNearbyFilter = async () => {
 .trail-card:hover {
   background-color: #e9e9e9;
 }
+
+.trail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0;
+}
+
+.tag-pill {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  background-color: #e3f2fd;
+  color: #2c7be5;
+  border: 1px solid #2c7be5;
+}
+
 
 .trail-name {
   margin: 0 0 4px 0;

@@ -170,16 +170,6 @@ const fetchExtras = async () => {
   }
 };
 
-
-/* ======================
-   LIFECYCLE
-   ====================== */
-onMounted(async () => {
-  await fetchUser();
-  await fetchExtras();
-  await enrichTrails();
-});
-
 /* ======================
    LOGOUT
    ====================== */
@@ -270,6 +260,14 @@ const enrichTrails = async () => {
   }
 };
 
+/* ======================
+   LIFECYCLE
+   ====================== */
+onMounted(async () => {
+  await fetchUser();
+  await fetchExtras();
+  await enrichTrails();
+});
 
 </script>
 
@@ -291,7 +289,6 @@ const enrichTrails = async () => {
     <main class="content">
       <!-- LEFT -->
       <aside class="left-column">
-        <div class="avatar"></div>
 
         <div class="actions">
           <button @click="logout">Log Out</button>
@@ -476,14 +473,6 @@ const enrichTrails = async () => {
   display: flex;
   flex-direction: column;
   align-items: center;
-}
-
-.avatar {
-  width: 140px;
-  height: 140px;
-  border-radius: 50%;
-  background: #ccc;
-  margin-bottom: 16px;
 }
 
 .actions {

@@ -16,6 +16,10 @@ export const getAllReports = () =>
 export const getReportById = (id) =>
   api.get(`/reports/${id}`);
 
+// Modifica report [Self | Admin]
+export const updateReport = (id, data) =>
+  api.put(`/reports/${id}`, data);
+
 // Elimina report [Self | Admin]
 export const deleteReport = (id) =>
   api.delete(`/reports/${id}`);

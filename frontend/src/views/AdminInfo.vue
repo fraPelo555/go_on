@@ -13,6 +13,7 @@ const router = useRouter();
 const isAuthorized = ref(false);
 const authError = ref("");
 const checkingAuth = ref(true);
+const username = ref(localStorage.getItem("username") || "");
 
 /* =========================
    ADMIN GUARD
@@ -20,7 +21,7 @@ const checkingAuth = ref(true);
 const checkAdminAccess = () => {
   const token = localStorage.getItem("token");
   const userId = localStorage.getItem("userId");
-  const isAdmin = localStorage.getItem("isAdmin"); // stringa!
+  const isAdmin = localStorage.getItem("isAdmin");
 
   if (!token || !userId) {
     authError.value = "Devi essere loggato per accedere a questa pagina.";
@@ -39,10 +40,10 @@ const checkAdminAccess = () => {
 /* =========================
    SERVICES
    ========================= */
-import { getTrails } from "../services/trailService";
-import { getUsers } from "../services/userService";
-import { getAllReports } from "../services/reportService";
-import { getAllFeedbacks } from "../services/feedbackService";
+import { getTrails, deleteTrail } from "../services/trailService";
+import { getUsers, updateUser, deleteUser } from "../services/userService";
+import { getAllReports, deleteReport } from "../services/reportService";
+import { getAllFeedbacks, deleteFeedback } from "../services/feedbackService";
 
 /* =========================
    STATE
@@ -58,7 +59,7 @@ const loading = ref(false);
 const error = ref(null);
 
 /* =========================
-   LOADERS (ADMIN ONLY)
+   LOADERS
    ========================= */
 const loadSentieri = async () => {
   loading.value = true;
@@ -78,7 +79,7 @@ const loadUtenti = async () => {
   error.value = null;
   try {
     const res = await getUsers();
-    users.value = res.data;
+    users.value = res.data.users || res.data;
   } catch {
     error.value = "Errore caricamento utenti";
   } finally {
@@ -113,11 +114,53 @@ const loadFeedbacks = async () => {
 };
 
 /* =========================
+   DELETE ACTIONS
+   ========================= */
+const handleDeleteTrail = async (id) => {
+  if (!confirm("Confermi la cancellazione del sentiero?")) return;
+  try {
+    await deleteTrail(id);
+    loadSentieri();
+  } catch (err) {
+    alert("Errore cancellazione sentiero");
+  }
+};
+
+const handleDeleteUser = async (id) => {
+  if (!confirm("Confermi la cancellazione dell'utente?")) return;
+  try {
+    await deleteUser(id);
+    loadUtenti();
+  } catch (err) {
+    alert("Errore cancellazione utente");
+  }
+};
+
+const handleDeleteReport = async (id) => {
+  if (!confirm("Confermi la cancellazione del report?")) return;
+  try {
+    await deleteReport(id);
+    loadReports();
+  } catch (err) {
+    alert("Errore cancellazione report");
+  }
+};
+
+const handleDeleteFeedback = async (id) => {
+  if (!confirm("Confermi la cancellazione del feedback?")) return;
+  try {
+    await deleteFeedback(id);
+    loadFeedbacks();
+  } catch (err) {
+    alert("Errore cancellazione feedback");
+  }
+};
+
+/* =========================
    TAB HANDLER
    ========================= */
 const selectTab = async (tab) => {
   activeTab.value = tab;
-
   if (tab === "sentieri") await loadSentieri();
   if (tab === "utenti") await loadUtenti();
   if (tab === "report") await loadReports();
@@ -125,34 +168,57 @@ const selectTab = async (tab) => {
 };
 
 /* =========================
+   NAVIGATION ACTIONS
+   ========================= */
+const editTrail = (id) => router.push({ path:"/new-track", query:{editId:id} });
+const viewTrailDetails = (idTrail) => router.push({ path: `/track-details/${idTrail}` });
+
+/* =========================
+   USER INLINE EDIT
+   ========================= */
+const editUserId = ref(null);
+const editedUsername = ref("");
+
+const startEditUser = (user) => {
+  editUserId.value = user._id;
+  editedUsername.value = user.username;
+};
+
+const saveUserEdit = async (userId) => {
+  try {
+    await updateUser(userId, { username: editedUsername.value });
+    editUserId.value = null;
+    loadUtenti();
+  } catch (err) {
+    alert("Errore durante il salvataggio dell'utente");
+  }
+};
+
+const cancelUserEdit = () => {
+  editUserId.value = null;
+};
+
+/* =========================
    INIT
    ========================= */
-onMounted(async () => {
+onMounted(() => {
   const ok = checkAdminAccess();
   checkingAuth.value = false;
-
-  if (!ok) {
-    // opzionale: redirect automatico
-    // setTimeout(() => router.push("/"), 2000);
-    return;
-  }
-
-  await loadSentieri();
+  if (!ok) return;
+  loadSentieri();
 });
 </script>
 
 <template>
-  <!-- BLOCCO TOTALE FINCHÉ CONTROLLA -->
-  <div v-if="checkingAuth" class="center">
-    Verifica permessi...
-  </div>
+  <!-- BLOCCO VERIFICA -->
+  <div v-if="checkingAuth" class="center">Verifica permessi...</div>
 
   <!-- ERRORE AUTH -->
-    <div v-if="authError" class="auth-error">
-      <h2>⛔ Accesso non autorizzato</h2>
-      <p>{{ authError }}</p>
-      <router-link to="/" class="back-btn">Torna alla Home</router-link>
-    </div>
+  <div v-if="authError" class="auth-error">
+    <h2>⛔ Accesso non autorizzato</h2>
+    <p>{{ authError }}</p>
+    <router-link to="/" class="back-btn">Torna alla Home</router-link>
+  </div>
 
   <!-- PAGINA ADMIN -->
   <div v-else class="admin-info-page">
@@ -170,6 +236,7 @@ onMounted(async () => {
 
       <div class="header-right">
         <router-link to="/" class="nav-btn">Home</router-link>
+        <div class="user-info"><span class="username-box">👤 {{ username }}</span></div>
         <router-link to="/profile" class="nav-btn">Profilo</router-link>
       </div>
     </header>
@@ -187,31 +254,63 @@ onMounted(async () => {
       <p v-if="loading">Caricamento...</p>
       <p v-if="error" class="error">{{ error }}</p>
 
+      <!-- SENTIERI -->
       <div v-if="activeTab === 'sentieri'">
         <div v-for="t in trails" :key="t._id" class="box">
           <h3>{{ t.title }}</h3>
           <p>ID: {{ t._id }}</p>
+          <div class="btn-group">
+            <button @click="editTrail(t._id)">Modifica</button>
+            <button @click="handleDeleteTrail(t._id)">Elimina</button>
+          </div>
         </div>
       </div>
 
+      <!-- UTENTI -->
       <div v-if="activeTab === 'utenti'">
         <div v-for="u in users" :key="u._id" class="box">
-          <h3>{{ u.username }}</h3>
-          <p>{{ u.email }}</p>
+          <div v-if="editUserId === u._id" class="user-edit">
+            <input v-model="editedUsername" />
+            <button @click="saveUserEdit(u._id)">Salva</button>
+            <button @click="cancelUserEdit">Annulla</button>
+          </div>
+          <div v-else>
+            <h3>{{ u.username }}</h3>
+            <p>Email: {{ u.email }}</p>
+            <div class="btn-group">
+              <button @click="startEditUser(u)">Modifica</button>
+              <button @click="handleDeleteUser(u._id)">Elimina</button>
+            </div>
+          </div>
         </div>
       </div>
 
+      <!-- REPORT -->
       <div v-if="activeTab === 'report'">
         <div v-for="r in reports" :key="r._id" class="box">
-          <h3>Report {{ r._id }}</h3>
-          <p>{{ r.reason || r.description }}</p>
+          <h3>Report #{{ r._id }}</h3>
+          <p>Motivazione: {{ r.reason || r.description }}</p>
+          <p>Trail: {{ r.idTrail?._id || r.idTrail }}</p>
+          <p>Utente: {{ r.idUser?.username || r.idUser }}</p>
+          <div class="btn-group">
+            <button @click="viewTrailDetails(r.idTrail)">Visualizza</button>
+            <button @click="handleDeleteReport(r._id)">Elimina</button>
+          </div>
         </div>
       </div>
 
+      <!-- FEEDBACK -->
       <div v-if="activeTab === 'feedback'">
         <div v-for="f in feedbacks" :key="f._id" class="box">
-          <h3>Feedback {{ f._id }}</h3>
-          <p>{{ f.text }}</p>
+          <h3>Feedback #{{ f._id }}</h3>
+          <p>Valutazione: {{ f.valutazione || f.rating }}</p>
+          <p>Testo: {{ f.text }}</p>
+          <p>Trail: {{ f.idTrail }}</p>
+          <p>Utente: {{ f.idUser }}</p>
+          <div class="btn-group">
+            <button @click="viewTrailDetails(f.idTrail)">Visualizza</button>
+            <button @click="handleDeleteFeedback(f._id)">Elimina</button>
+          </div>
         </div>
       </div>
     </main>
@@ -288,13 +387,34 @@ onMounted(async () => {
   border: 1px solid #ccc;
   padding: 16px;
   margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.btn-group {
+  display: flex;
+  gap: 8px;
+}
+
+.btn-group button {
+  padding: 6px 12px;
+  background: #2c7be5;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.user-edit input {
+  margin-bottom: 8px;
+  padding: 4px 8px;
 }
 
 .error {
   color: red;
 }
 
-/* Error */
 .auth-error {
   height: 100vh;
   display: flex;
