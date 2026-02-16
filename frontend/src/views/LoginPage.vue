@@ -276,31 +276,36 @@ onMounted(() => {
 </template>
 
 <style scoped>
-/* PAGE */
+
+/* ================= PAGE ================= */
 .login-page {
-  height: 100vh;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
-/* HEADER */
+/* ================= HEADER ================= */
 .header {
-  height: 80px;
+  min-height: 80px;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   padding: 0 24px;
   border-bottom: 1px solid #ddd;
+  gap: 12px;
 }
 
 .logo {
   height: 50px;
+  max-width: 100%;
+  object-fit: contain;
 }
 
 .header-right {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+  flex-wrap: wrap;
 }
 
 .home-btn {
@@ -309,16 +314,20 @@ onMounted(() => {
   background-color: #2c7be5;
   color: white;
   text-decoration: none;
+  font-size: 0.9rem;
 }
 
-/* BODY */
+/* ================= BODY ================= */
 .login-body {
   flex: 1;
   display: flex;
   align-items: center;
+  justify-content: center;
+  padding: 24px;
+  gap: 24px;
 }
 
-/* LEFT */
+/* ================= LEFT ================= */
 .left-section {
   flex: 1;
   text-align: center;
@@ -326,9 +335,10 @@ onMounted(() => {
 
 .left-section h1 {
   font-size: 48px;
+  word-break: break-word;
 }
 
-/* CENTER */
+/* ================= CENTER ================= */
 .center-section {
   flex: 1;
   display: flex;
@@ -336,37 +346,27 @@ onMounted(() => {
 }
 
 .form {
-  width: 280px;
+  width: 100%;
+  max-width: 320px;
   display: flex;
   flex-direction: column;
 }
 
+/* ================= TABS ================= */
 .tab-bar {
   display: flex;
   border-bottom: 1px solid #ccc;
   margin-bottom: 24px;
 }
 
-.popup {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  background: white;
-  border: 1px solid #333;
-  padding: 24px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-  z-index: 9999;
-  text-align: center;
-}
-
 .tab {
   flex: 1;
   text-align: center;
-  padding: 16px;
+  padding: 14px;
   cursor: pointer;
   background: #f5f5f5;
   transition: background 0.2s;
+  font-size: 0.9rem;
 }
 
 .tab:hover {
@@ -378,15 +378,18 @@ onMounted(() => {
   font-weight: bold;
 }
 
+/* ================= FORM ================= */
 label {
   display: flex;
   flex-direction: column;
   margin-bottom: 12px;
+  font-size: 0.9rem;
 }
 
 input {
   padding: 8px;
   margin-top: 4px;
+  font-size: 0.9rem;
 }
 
 .forgot {
@@ -402,16 +405,17 @@ input {
   color: white;
   border: none;
   cursor: pointer;
+  border-radius: 6px;
 }
 
-/* DIVIDER */
+/* ================= DIVIDER ================= */
 .divider {
   width: 1px;
   height: 50%;
   background-color: #ddd;
 }
 
-/* RIGHT */
+/* ================= RIGHT ================= */
 .right-section {
   flex: 1;
   display: flex;
@@ -421,4 +425,91 @@ input {
 .google-btn {
   margin-top: 20px;
 }
+
+/* ================= POPUP ================= */
+.popup {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: white;
+  border: 1px solid #333;
+  padding: 24px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  z-index: 9999;
+  text-align: center;
+  width: 90%;
+  max-width: 400px;
+}
+
+/* ================= RESPONSIVE ================= */
+
+/* Tablet */
+@media (max-width: 1024px) {
+  .left-section h1 {
+    font-size: 36px;
+  }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+
+  .header {
+    grid-template-columns: 1fr auto;
+    padding: 0 16px;
+  }
+
+  .header-right {
+    justify-content: flex-end;
+  }
+
+  .login-body {
+    flex-direction: column;
+    gap: 32px;
+    padding: 24px 16px;
+  }
+
+  .left-section h1 {
+    font-size: 28px;
+  }
+
+  .divider {
+    display: none;
+  }
+
+  .right-section {
+    width: 100%;
+  }
+
+  .center-section {
+    width: 100%;
+  }
+
+  .form {
+    max-width: 100%;
+  }
+}
+
+/* Small mobile */
+@media (max-width: 480px) {
+
+  .left-section h1 {
+    font-size: 22px;
+  }
+
+  .tab {
+    padding: 10px;
+    font-size: 0.8rem;
+  }
+
+  input {
+    font-size: 0.85rem;
+  }
+
+  .login-btn {
+    font-size: 0.85rem;
+  }
+}
+
 </style>
+

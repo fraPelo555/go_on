@@ -2,6 +2,9 @@
 import { ref, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import dayjs from "dayjs";
+import { getTrailById } from "../services/trailService"; // Assicurati di importare
+import { getGPX } from "../services/trailService";
+
 
 /* =========================
    SERVICES
@@ -101,8 +104,26 @@ const loadStatistics = async () => {
       t.updatedAt && dayjs(t.updatedAt).isAfter(lastMonth)
     ).length;
 
-    const trailsWithGPX = trailsData.filter(t => t.gpxFile).length;
-    stats.value.gpxPercent = trailsData.length ? Math.round((trailsWithGPX / trailsData.length) * 100) : 0;
+    // ================= GPX REAL CHECK =================
+    let gpxCount = 0;
+       
+    await Promise.all(
+      trailsData.map(async (t) => {
+        const id = t._id ?? t.id;
+        if (!id) return;
+      
+        try {
+          await getGPX(id); // prova a scaricare il GPX
+          gpxCount++;       // se non lancia errore → GPX esiste
+        } catch (err) {
+          // 404 o errore → niente GPX
+        }
+      })
+    );
+     
+    stats.value.gpxPercent = trailsData.length
+      ? Math.round((gpxCount / trailsData.length) * 100)
+      : 0;
 
     const trailsWithPhotos = trailsData.filter(t => (t.photos?.length || 0) > 0).length;
     stats.value.photoPercent = trailsData.length ? Math.round((trailsWithPhotos / trailsData.length) * 100) : 0;
@@ -234,11 +255,11 @@ onMounted(() => {
       <main class="grid">
         <!-- STATISTICHE GENERALI -->
         <div class="card">
-          <div class="row"><span>Total Routes</span><span>{{ stats.totalRoutes }}</span></div>
-          <div class="row"><span>Created This Month</span><span>{{ stats.createdMonth }}</span></div>
-          <div class="row"><span>Modified This Month</span><span>{{ stats.modifiedMonth }}</span></div>
-          <div class="row"><span>Registered Users</span><span>{{ stats.users }}</span></div>
-          <div class="row"><span>Registrations This Month</span><span>{{ stats.usersMonth }}</span></div>
+          <div class="row"><span>Total Routes: </span><span>{{ stats.totalRoutes }}</span></div>
+          <div class="row"><span>Created This Month: </span><span>{{ stats.createdMonth }}</span></div>
+          <div class="row"><span>Modified This Month: </span><span>{{ stats.modifiedMonth }}</span></div>
+          <div class="row"><span>Registered Users: </span><span>{{ stats.users }}</span></div>
+          <div class="row"><span>Registrations This Month: </span><span>{{ stats.usersMonth }}</span></div>
         </div>
 
         <!-- MEDIA RECENSIONI -->
@@ -300,12 +321,9 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.stats-page {
-  display: flex;
-  flex-direction: column;
-  padding: 16px;
-}
 
+
+/* ================= HEADER ================= */
 .header {
   height: 80px;
   display: grid;
@@ -313,53 +331,94 @@ onMounted(() => {
   align-items: center;
   padding: 0 24px;
   border-bottom: 1px solid #ddd;
+  gap: 12px;
 }
 
 .logo {
   height: 50px;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.header-left,
+.header-right {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.header-left {
+  justify-content: flex-start;
+}
+
+.header-right {
+  justify-content: flex-end;
 }
 
 .nav-btn {
-  text-decoration: none;
-  padding: 6px 12px;
-  background: #2c7be5;
-  color: white;
+  padding: 8px 16px;
   border-radius: 6px;
+  background-color: #2c7be5;
+  color: white;
+  text-decoration: none;
+  font-size: 0.9rem;
 }
 
+/* ================= GRID CARDS ================= */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill,minmax(200px,1fr));
+  grid-template-columns: repeat(4, 1fr); /* desktop */
   gap: 16px;
   margin-top: 24px;
 }
 
-.header-right {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-end;
-}
-
-.header-left {
-  display: flex;
-  gap: 12px;
-  justify-content: flex-start;
-}
-
 .card {
-  border: 1px solid #ccc;
-  padding: 12px;
-  background: #fafafa;
+  aspect-ratio: 16 / 12; /* card quadrata */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;  /* centra verticalmente */
+  align-items: center;      /* centra orizzontalmente */
+  text-align: center;
+  border: 1px solid #ddd;
+  padding: 16px;
+  background: #ffffff;
+  border-radius: 8px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  overflow: hidden;
 }
 
+.card .scrollable {
+  overflow-y: auto;
+}
+
+.card input[readonly] {
+  width: 100%;
+  border: none;
+  background: #f0f0f0;
+  padding: 6px 8px;
+  margin-bottom: 4px;
+  border-radius: 4px;
+}
+
+.card h3 {
+  white-space: normal;   
+  word-break: break-word;
+  margin-bottom: 12px;
+}
+
+/* ================= CONTENT CENTER ================= */
 .center {
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .row {
   display: flex;
   justify-content: space-between;
-  margin: 4px 0;
+  margin: 6px 0;
 }
 
 .stars {
@@ -373,10 +432,11 @@ onMounted(() => {
 }
 
 .tags span {
+  padding: 6px 8px;
+  font-size: 0.9rem;
+  border-radius: 4px;
   background: #2c7be5;
   color: white;
-  padding: 4px 6px;
-  border-radius: 4px;
 }
 
 .pie {
@@ -385,6 +445,7 @@ onMounted(() => {
   color: #2c7be5;
 }
 
+/* ================= ERROR ================= */
 .auth-error {
   padding: 24px;
   text-align: center;
@@ -399,5 +460,48 @@ onMounted(() => {
   color: white;
   border-radius: 6px;
   text-decoration: none;
+}
+
+/* ===================== MEDIA QUERIES ===================== */
+@media (max-width: 1200px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr); /* tablet / small desktop */
+  }
+}
+
+@media (max-width: 768px) {
+  .grid {
+    grid-template-columns: 1fr; /* mobile */
+  }
+
+  .header {
+    padding: 0 12px;
+    grid-template-columns: 1fr auto 1fr;
+  }
+
+  .header-left,
+  .header-right {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .nav-btn {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+  }
+
+  .card {
+    padding: 12px;
+  }
+
+  .tags span {
+    font-size: 0.85rem;
+    padding: 4px 6px;
+  }
+
+  .row {
+    margin: 4px 0;
+  }
 }
 </style>

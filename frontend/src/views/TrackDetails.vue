@@ -458,7 +458,6 @@ const exportPDF = async () => {
     console.warn("Errore caricamento logo", e);
   }
 
-  // --- PREPARA MAPPA: nascondi controlli temporaneamente per screenshot ---
   let mapDataURL = null;
   let hiddenControls = [];
   try {
@@ -752,7 +751,6 @@ onMounted(async () => {
   await loadTrail();
   await checkIsFavourite();
 
-  // 🔥 CARICA GPX PER LA MAPPA
   try {
     const res = await getGPX(trailId);
     gpxData.value = res.data;   // testo XML
@@ -1174,6 +1172,11 @@ onMounted(async () => {
   width: 100%;
   min-height: 70px;
   resize: vertical;
+}
+
+.header-left {
+  display: flex;
+  gap: 12px;
 }
 
 textarea {

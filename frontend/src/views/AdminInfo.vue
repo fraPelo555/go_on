@@ -316,52 +316,69 @@ onMounted(() => {
     </main>
   </div>
 </template>
-
 <style scoped>
+
+/* ================= CENTER LOADING ================= */
 .center {
-  height: 100vh;
+  min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 1.2rem;
+  padding: 24px;
+  text-align: center;
 }
 
+/* ================= PAGE ================= */
 .admin-info-page {
-  height: 100vh;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
 }
 
+/* ================= HEADER ================= */
 .header {
-  height: 80px;
+  min-height: 80px;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   padding: 0 24px;
   border-bottom: 1px solid #ddd;
+  gap: 12px;
 }
 
 .logo {
   height: 50px;
+  max-width: 100%;
+  object-fit: contain;
 }
 
 .header-left,
 .header-right {
   display: flex;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+.header-right {
+  justify-content: flex-end;
 }
 
 .nav-btn {
-  text-decoration: none;
-  padding: 6px 12px;
-  background: #2c7be5;
-  color: white;
+  padding: 8px 16px;
   border-radius: 6px;
+  background-color: #2c7be5;
+  color: white;
+  text-decoration: none;
+  font-size: 0.9rem;
+  white-space: nowrap;
 }
 
+/* ================= TAB BAR ================= */
 .tab-bar {
   display: flex;
   border-bottom: 1px solid #ccc;
+  width: 100%;
 }
 
 .tab {
@@ -370,6 +387,12 @@ onMounted(() => {
   padding: 16px;
   cursor: pointer;
   background: #f5f5f5;
+  transition: background 0.2s;
+  font-size: 0.95rem;
+}
+
+.tab:hover {
+  background: #e6e6e6;
 }
 
 .tab.active {
@@ -377,24 +400,31 @@ onMounted(() => {
   font-weight: bold;
 }
 
+/* ================= CONTENT ================= */
 .content {
   flex: 1;
   padding: 24px;
   overflow-y: auto;
 }
 
+/* ================= BOX ================= */
 .box {
   border: 1px solid #ccc;
   padding: 16px;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
   display: flex;
   flex-direction: column;
   gap: 8px;
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
 
+/* ================= BUTTON GROUP ================= */
 .btn-group {
   display: flex;
   gap: 8px;
+  flex-wrap: wrap;
 }
 
 .btn-group button {
@@ -404,24 +434,29 @@ onMounted(() => {
   border: none;
   border-radius: 6px;
   cursor: pointer;
+  font-size: 0.85rem;
 }
 
+/* ================= USER EDIT ================= */
 .user-edit input {
   margin-bottom: 8px;
-  padding: 4px 8px;
+  padding: 6px 8px;
+  font-size: 0.9rem;
 }
 
+/* ================= ERRORS ================= */
 .error {
   color: red;
 }
 
 .auth-error {
-  height: 100vh;
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
   text-align: center;
+  padding: 24px;
 }
 
 .back-btn {
@@ -432,4 +467,76 @@ onMounted(() => {
   text-decoration: none;
   border-radius: 6px;
 }
+
+/* ================= RESPONSIVE ================= */
+
+/* Tablet */
+@media (max-width: 1024px) {
+  .content {
+    padding: 20px;
+  }
+
+  .tab {
+    font-size: 0.9rem;
+    padding: 14px;
+  }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+
+  .header {
+    grid-template-columns: 1fr auto;
+    padding: 0 16px;
+  }
+
+  .header-left,
+  .header-right {
+    justify-content: center;
+  }
+
+  .tab-bar {
+    flex-direction: column;
+  }
+
+  .tab {
+    border-bottom: 1px solid #ddd;
+  }
+
+  .content {
+    padding: 16px;
+  }
+
+  .box {
+    padding: 14px;
+  }
+
+  .btn-group {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .btn-group button {
+    width: 100%;
+  }
+}
+
+/* Small Mobile */
+@media (max-width: 480px) {
+
+  .tab {
+    font-size: 0.85rem;
+    padding: 12px;
+  }
+
+  .nav-btn {
+    font-size: 0.8rem;
+    padding: 6px 10px;
+  }
+
+  .box {
+    padding: 12px;
+  }
+}
+
 </style>

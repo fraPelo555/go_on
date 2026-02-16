@@ -1,4 +1,6 @@
 <script setup>
+
+// IMPORTS
 import { ref, watch, onMounted, computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import TrailMap from "../components/TrailMap.vue";
@@ -6,26 +8,15 @@ import { getTrails, deleteTrail, getNearbyTrails } from "../services/trailServic
 import { addFavourite, removeFavourite, getFavourites } from "../services/userService";
 import { getGPX } from "../services/trailService";
 
-
-
-const gpxPopupMessage = ref("");
-const gpxPopupVisible = ref(false);
-
-const showGpxPopup = (msg) => {
-  gpxPopupMessage.value = msg;
-  gpxPopupVisible.value = true;
-  setTimeout(() => {
-    gpxPopupVisible.value = false;
-  }, 1800); // 1,8 secondi
-};
-
-
-
 /* =========================
    ROUTER
 ========================= */
 const route = useRoute();
 const router = useRouter();
+
+const goToDetails = (trailId) => {
+  router.push(`/tracks/${trailId}`);
+};
 
 /* =========================
    STATE
@@ -37,6 +28,21 @@ const selectedTags = ref([]);
 const searchText = ref("");
 const favouriteIds = ref(new Set());
 const checkingFav = ref(false);
+
+
+/* =========================
+   MISSING GPX POPUP
+========================= */
+const gpxPopupMessage = ref("");
+const gpxPopupVisible = ref(false);
+
+const showGpxPopup = (msg) => {
+  gpxPopupMessage.value = msg;
+  gpxPopupVisible.value = true;
+  setTimeout(() => {
+    gpxPopupVisible.value = false;
+  }, 1800); // 1,8 secondi
+};
 
 /* =========================
    AUTH
@@ -166,12 +172,6 @@ const handleDeleteTrail = async (trailId) => {
     visibleTrails.value = visibleTrails.value.filter(t=>t.id!==trailId);
   } catch(err){ console.error(err); }
 };
-
-// click sul bottone "Dettagli"
-const goToDetails = (trailId) => {
-  router.push(`/tracks/${trailId}`);
-};
-
 
 /* =========================
    GEOLOC
@@ -384,10 +384,12 @@ onMounted(async () => {
 
 
 <style scoped>
+/* ================= GLOBAL ================= */
 .homepage {
   height: 100vh;
   display: flex;
   flex-direction: column;
+  font-family: sans-serif;
 }
 
 /* ================= HEADER ================= */
@@ -398,15 +400,23 @@ onMounted(async () => {
   align-items: center;
   padding: 0 24px;
   border-bottom: 1px solid #ddd;
+  gap: 12px;
 }
 
 .logo {
   height: 50px;
+  max-width: 100%;
+  object-fit: contain;
 }
 
+.header-left,
 .header-right {
   display: flex;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+.header-right {
   justify-content: flex-end;
 }
 
@@ -416,14 +426,19 @@ onMounted(async () => {
   background-color: #2c7be5;
   color: white;
   text-decoration: none;
+  font-size: 0.9rem;
 }
 
 /* ================= BODY ================= */
 .main-content {
   flex: 1;
   display: flex;
+  overflow: hidden;
+  min-height: calc(100vh - var(--header-h)); /* => vincolo di altezza per i figli */
+  flex-wrap: wrap;
 }
 
+/* FAV BUTTON */
 .fav-btn {
   background: none;
   border: none;
@@ -439,6 +454,7 @@ onMounted(async () => {
 .map-section {
   flex: 2;
   position: relative;
+  min-height: 300px;
 }
 
 .map-container {
@@ -459,20 +475,21 @@ onMounted(async () => {
   z-index: 9999;
   font-size: 14px;
 }
+
 .fade-enter-active, .fade-leave-active {
   transition: opacity 0.3s;
 }
+
 .fade-enter-from, .fade-leave-to {
   opacity: 0;
 }
-
 
 /* GEO BUTTON */
 .geo-btn {
   position: absolute;
   bottom: 20px;
   left: 20px;
-  z-index: 1000;          /* 👈 FONDAMENTALE */
+  z-index: 1000;
   width: 48px;
   height: 48px;
   border-radius: 50%;
@@ -483,6 +500,7 @@ onMounted(async () => {
   box-shadow: 0 2px 6px rgba(0,0,0,0.3);
 }
 
+/* ================= TAGS ================= */
 .tag-group {
   margin-bottom: 10px;
 }
@@ -523,12 +541,19 @@ onMounted(async () => {
 /* ================= SIDEBAR ================= */
 .sidebar {
   width: 360px;
+  min-width: 240px;
   padding: 16px;
   border-left: 1px solid #ddd;
   display: flex;
   flex-direction: column;
+  min-height: 0;                 /* già presente: utile */
+  height: 100%;                  /* importante: prende l'altezza dal main-content */
+  max-height: calc(100vh - var(--header-h)); /* difesa extra */
+  overflow: hidden;              /* lascia lo scrolling interno a .results */
 }
 
+
+/* SEARCH & ADVANCED */
 .search-input {
   padding: 8px;
   margin-bottom: 8px;
@@ -540,9 +565,14 @@ onMounted(async () => {
 
 /* ================= RESULTS ================= */
 .results {
-  flex: 1;
+  flex: 1 1 auto;     /* occupa lo spazio rimanente nella sidebar */
+  min-height: 0;      /* CRUCIALE per permettere lo scrolling interno in un flex item */
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch; /* scorrimento fluido su iOS */
 }
+
+/* variabile per altezza header (comoda se cambierai l'header) */
+:root { --header-h: 80px; }
 
 .no-trails {
   font-style: italic;
@@ -552,13 +582,19 @@ onMounted(async () => {
 }
 
 .trail-card {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* vertical center */
   padding: 12px;
-  margin-bottom: 10px;
   background-color: #f5f5f5;
   border-radius: 8px;
   text-decoration: none;
   color: inherit;
+  transition: background 0.2s ease;
+}
+
+.trail-card:hover {
+  background-color: #e9e9e9;
 }
 
 .trail-card a {
@@ -568,11 +604,6 @@ onMounted(async () => {
 
 .trail-card a:hover {
   text-decoration: none;
-  color: inherit;
-}
-
-.trail-card:hover {
-  background-color: #e9e9e9;
 }
 
 .trail-tags {
@@ -590,7 +621,6 @@ onMounted(async () => {
   color: #2c7be5;
   border: 1px solid #2c7be5;
 }
-
 
 .trail-name {
   margin: 0 0 4px 0;
@@ -623,5 +653,66 @@ onMounted(async () => {
   display: flex;
   gap: 8px;
   margin-top: 6px;
+}
+
+/* ===================== MEDIA QUERIES ===================== */
+@media (max-width: 1200px) {
+  .main-content {
+    flex-direction: column;
+  }
+  
+  .sidebar {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid #ddd;
+  }
+  
+  .map-section {
+    flex: 1;
+    min-height: 300px;
+  }
+}
+
+/* (opzionale) se vuoi una fallback più esplicita */
+@media (max-width: 1200px) {
+  .sidebar {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid #ddd;
+    max-height: none;
+    height: auto;
+  }
+  .results {
+    /* su mobile il layout diventa verticale, mantenere comunque min-height:0 */
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .header {
+    grid-template-columns: 1fr auto 1fr;
+    padding: 0 12px;
+  }
+
+  .header-left,
+  .header-right {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .login-btn {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+  }
+
+  .sidebar {
+    padding: 12px;
+  }
+  
+  .trail-card {
+    padding: 10px;
+  }
 }
 </style>

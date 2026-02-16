@@ -192,6 +192,7 @@ const saveTrack = async () => {
     coordinates: JSON.stringify({
       DD: { lat: Number(form.value.lat), lon: Number(form.value.lon) }
     }),
+    idAdmin: form.value.idAdmin
   };
 
   try {
@@ -292,15 +293,25 @@ watch(activeMode, async (newVal) => {
 
     <div v-else class="new-track-page">
 
+  
+
       <header class="header">
-        <router-link to="/admin" class="nav-btn">AdminInfo</router-link>
-        <router-link to="/statistics" class="nav-btn">Statistiche</router-link>
-        <img src="../assets/goon_logo.png" class="logo" />
-        <router-link to="/" class="nav-btn">Home</router-link>
-        <div class="user-info">
-          <span class="username-box">👤 {{ username }}</span>
+        <div class="header-left">
+         <router-link to="/admin" class="nav-btn">AdminInfo</router-link>
+         <router-link to="/statistics" class="nav-btn">Statistiche</router-link>
         </div>
-        <router-link to="/profile" class="nav-btn">Profilo</router-link>
+
+        <div class="header">
+         <img src="../assets/goon_logo.png" class="logo" />
+        </div>
+
+        <div class="header-right">
+         <router-link to="/" class="nav-btn">Home</router-link>
+         <div class="user-info">
+           <span class="username-box">👤 {{ username }}</span>
+         </div>
+         <router-link to="/profile" class="nav-btn">Profilo</router-link>
+        </div>        
       </header>
 
       <!-- MODE BAR -->
@@ -429,13 +440,29 @@ watch(activeMode, async (newVal) => {
 .form-body { flex:1; display:flex; gap:24px; padding:24px; }
 .column { flex:1; display:flex; flex-direction:column; gap:8px; }
 .inline { display:flex; gap:8px; }
-.nav-btn { background:#2c7be5; color:white; padding:6px 12px; border-radius:6px; text-decoration:none; }
+.nav-btn {
+  padding: 8px 16px;        /* aumentare da 6x12 a 8x16 */
+  border-radius: 6px;       /* uguale */
+  background-color: #2c7be5;
+  color: white;
+  text-decoration: none;
+}
 .save-btn { margin-top:8px; background:#2c7be5; color:white; padding:10px 14px; border:none; cursor:pointer; }
 .tag-row { display:flex; flex-wrap:wrap; gap:6px; margin-top:6px }
 .tag-btn { border:1px solid #aaa; background:#f5f5f5; padding:4px 8px; cursor:pointer }
 .tag-btn.active { background:#2c7be5; color:white; border-color:#2c7be5 }
 .auth-error { height:100vh; display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center }
 .back-btn { margin-top:16px; padding:8px 16px; background:#2c7be5; color:white; text-decoration:none; border-radius:6px }
+
+.header-left {
+  display: flex;
+  gap: 12px;
+}
+.header-right {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
 
 .mode-label {
   text-align:center;

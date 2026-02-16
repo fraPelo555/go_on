@@ -21,7 +21,6 @@ const trailMap = ref({}); // { [idTrail]: trailObject }
 const router = useRouter();
 const userId = localStorage.getItem("userId");
 
-// se non c'è userId -> vai al login subito
 if (!userId) {
   router.push("/login");
 }
@@ -50,10 +49,7 @@ const form = ref({
 /* ======================
    HELPERS
    ====================== */
-/**
- * Estrae coordinate in modo robusto dal trail ricevuto dal backend.
- * Supporta sia coordinates.DD.lat/lon che location.coordinates [lon,lat]
- */
+
 const extractCoords = (trail) => {
   if (!trail) return null;
   // case: trail.coordinates?.DD?.lat / lon
