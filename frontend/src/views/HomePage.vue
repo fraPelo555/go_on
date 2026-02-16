@@ -4,6 +4,22 @@ import { useRoute, useRouter } from "vue-router";
 import TrailMap from "../components/TrailMap.vue";
 import { getTrails, deleteTrail, getNearbyTrails } from "../services/trailService";
 import { addFavourite, removeFavourite, getFavourites } from "../services/userService";
+import { getGPX } from "../services/trailService";
+
+
+
+const gpxPopupMessage = ref("");
+const gpxPopupVisible = ref(false);
+
+const showGpxPopup = (msg) => {
+  gpxPopupMessage.value = msg;
+  gpxPopupVisible.value = true;
+  setTimeout(() => {
+    gpxPopupVisible.value = false;
+  }, 1800); // 1,8 secondi
+};
+
+
 
 /* =========================
    ROUTER
@@ -151,6 +167,12 @@ const handleDeleteTrail = async (trailId) => {
   } catch(err){ console.error(err); }
 };
 
+// click sul bottone "Dettagli"
+const goToDetails = (trailId) => {
+  router.push(`/tracks/${trailId}`);
+};
+
+
 /* =========================
    GEOLOC
 ========================= */
@@ -171,11 +193,52 @@ const enableGeolocation = () => {
 /* =========================
    MAP CENTER
 ========================= */
+const activeGPX = ref(null);
+
 const mapCenter = computed(() => {
   if(centerMode.value==="geoloc" && geolocCenter.value) return geolocCenter.value;
   if(visibleTrails.value?.length) return visibleTrails.value[0].location || {lat:45.4394, lon:7.6473};
   return {lat:45.4394, lon:7.6473};
 });
+
+const mapMarkers = computed(() =>
+  visibleTrails.value
+    .filter(t => t.location)
+    .map(t => ({
+      id: t.id,
+      lat: Number(t.location.lat),
+      lon: Number(t.location.lon),
+      title: t.title
+    }))
+);
+
+const handleMarkerClick = async (trailId) => {
+  try {
+    // porta il trail in cima
+    const selected = visibleTrails.value.find(t => t.id === trailId);
+    if (!selected) return;
+
+    visibleTrails.value = [
+      selected,
+      ...visibleTrails.value.filter(t => t.id !== trailId)
+    ];
+
+    // carica GPX
+    const { data } = await getGPX(trailId);
+    activeGPX.value = data;
+
+  } catch (err) {
+    // mostra pop-up invece di log
+    showGpxPopup("Attenzione: questo sentiero non ha una traccia GPX");
+    activeGPX.value = null; // pulisci mappa se vuoi
+  }
+};
+
+const handleTrailCardClick = (trailId) => {
+  handleMarkerClick(trailId);
+};
+
+
 
 /* =========================
    PROXIMITY FILTER
@@ -232,13 +295,26 @@ onMounted(async () => {
 
     <!-- MAP -->
     <section class="map-section">
-      <TrailMap :center="mapCenter" :zoom="13" @centerChanged="c=>{filterLat=c.lat; filterLon=c.lon}"/>
+      <TrailMap
+        :center="mapCenter"
+        :zoom="13"
+        :markers="mapMarkers"
+        :gpx="activeGPX"
+        @centerChanged="c=>{filterLat=c.lat; filterLon=c.lon}"
+        @markerClicked="handleMarkerClick"
+      />
       <button class="geo-btn" @click="enableGeolocation" :disabled="geolocLoading" title="Usa la tua posizione">
         <span v-if="geolocLoading">…</span>
         <span v-else>📍</span>
       </button>
       <div v-if="geolocError" class="geoloc-error">{{ geolocError }}</div>
     </section>
+
+    <transition name="fade">
+      <div v-if="gpxPopupVisible" class="gpx-popup">
+        {{ gpxPopupMessage }}
+      </div>
+    </transition>
 
     <!-- SIDEBAR -->
     <aside class="sidebar">
@@ -273,34 +349,33 @@ onMounted(async () => {
 
       <!-- RESULTS -->
       <div class="results">
-        <div v-for="trail in visibleTrails" :key="trail.id" class="trail-card">
-          <router-link :to="`/tracks/${trail.id}`">
-            <h4>{{ trail.title }}</h4>
-              <div class="trail-tags">
-                <span
-                  v-for="tag in trail.tags"
-                  :key="tag"
-                  class="tag-pill"
-                >
-                  {{ tag.replaceAll('_',' ') }}
-                </span>
-              </div>
-            <div class="trail-meta">
-              <span>{{ trail.lengthLabel }}</span>
-              <span>{{ trail.durationLabel }}</span>
-              <span>{{ trail.difficulty }}</span>
-            </div>
-          </router-link>
+        <div v-for="trail in visibleTrails" :key="trail.id" class="trail-card" @click="handleTrailCardClick(trail.id)">
 
+          <h4>{{ trail.title }}</h4>
+          <div class="trail-tags">
+            <span v-for="tag in trail.tags" :key="tag" class="tag-pill">
+              {{ tag.replaceAll('_',' ') }}
+            </span>
+          </div>
+          <div class="trail-meta">
+            <span>{{ trail.lengthLabel }}</span>
+            <span>{{ trail.durationLabel }}</span>
+            <span>{{ trail.difficulty }}</span>
+          </div>
+         
           <div class="trail-actions">
             <button v-if="isLogged" class="fav-btn" :class="{active:favouriteIds.has(trail.id)}" @click.stop="toggleFavourite(trail.id)">
               <span v-if="favouriteIds.has(trail.id)">★</span><span v-else>☆</span>
             </button>
-            <button v-if="isAdmin" @click="handleEditTrail(trail.id)">✏️</button>
-            <button v-if="isAdmin" @click="handleDeleteTrail(trail.id)">🗑️</button>
+            <button v-if="isAdmin" @click.stop="handleEditTrail(trail.id)">✏️</button>
+            <button v-if="isAdmin" @click.stop="handleDeleteTrail(trail.id)">🗑️</button>
+           
+            <!-- NUOVO BOTTONE DETTAGLI -->
+            <button class="details-btn" @click.stop="goToDetails(trail.id)">Dettagli</button>
           </div>
         </div>
       </div>
+
     </aside>
 
   </main>
@@ -370,6 +445,27 @@ onMounted(async () => {
   width: 100%;
   height: 100%;
 }
+
+.gpx-popup {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #f8d7da;
+  color: #842029;
+  padding: 8px 14px;
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  z-index: 9999;
+  font-size: 14px;
+}
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.3s;
+}
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+}
+
 
 /* GEO BUTTON */
 .geo-btn {

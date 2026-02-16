@@ -405,6 +405,9 @@ const mapCenter = computed(() => {
   };
 });
 
+const gpxData = ref(null);
+
+
 const exportPDF = async () => {
   if (!trail.value) return alert("Nessun sentiero caricato");
 
@@ -749,11 +752,20 @@ onMounted(async () => {
   await loadTrail();
   await checkIsFavourite();
 
+  // 🔥 CARICA GPX PER LA MAPPA
+  try {
+    const res = await getGPX(trailId);
+    gpxData.value = res.data;   // testo XML
+  } catch (err) {
+    console.error("Errore caricamento GPX:", err);
+  }
+
   if (isLogged) {
     await loadFeedbacks();
     await loadReports();
   }
 });
+
 
 
 </script>
@@ -935,6 +947,7 @@ onMounted(async () => {
               v-if="mapCenter"
               :center="mapCenter"
               :zoom="14"
+              :gpx="gpxData"
             />
           </div>
 
