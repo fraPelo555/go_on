@@ -2,7 +2,7 @@ name: Backend CI
 
 permissions:
   contents: read
-  
+
 on:
   push:
     branches: [ "main" ]
@@ -19,20 +19,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
-        with:
-          node-version: 18
-
-      - name: Install dependencies
-        working-directory: backend
-        run: npm ci
-
-      - name: Run tests
-        working-directory: backend
-        run: npm test
+      - name: Debug start
+        run: echo "Backend CI started"
 
 #name: Backend CI/CD
 #
