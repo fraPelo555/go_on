@@ -170,7 +170,43 @@ const saveTrack = async () => {
     return;
   }
 
-  const payload = {
+  try {
+    // esegui create o update e cattura la response
+    let response = null;
+    let trailIdForUpload = null;
+    
+    if (activeMode.value === "update") {
+      if (!editId || !isValidObjectId(editId)) {
+        alert("ID del sentiero mancante o non valido nell'URL.");
+        return;
+      }
+        const payload = {
+    title: form.value.title.trim(),
+    description: form.value.description || "",
+    region: form.value.region || "",
+    valley: form.value.valley || "",
+    difficulty: form.value.difficulty || "Easy",
+    lengthKm: Number(form.value.lengthKm || 0),
+    duration: JSON.stringify({
+      hours: Number(form.value.duration.hours || 0),
+      minutes: Number(form.value.duration.minutes || 0)
+    }),
+    ascentM: Number(form.value.ascentM || 0),
+    descentM: Number(form.value.descentM || 0),
+    highestPointM: Number(form.value.highestPointM || 0),
+    lowestPointM: Number(form.value.lowestPointM || 0),
+    roadbook: form.value.roadbook || "",
+    directions: form.value.directions || "",
+    parking: form.value.parking || "",
+    tags: JSON.stringify(form.value.tags || []),
+    coordinates: JSON.stringify({
+      DD: { lat: Number(form.value.lat), lon: Number(form.value.lon) }
+    }),
+  };
+      response = await updateTrail(editId, payload);
+      trailIdForUpload = editId;
+    } else {
+       const payload = {
     title: form.value.title.trim(),
     description: form.value.description || "",
     region: form.value.region || "",
@@ -194,20 +230,6 @@ const saveTrack = async () => {
     }),
     idAdmin: form.value.idAdmin
   };
-
-  try {
-    // esegui create o update e cattura la response
-    let response = null;
-    let trailIdForUpload = null;
-    
-    if (activeMode.value === "update") {
-      if (!editId || !isValidObjectId(editId)) {
-        alert("ID del sentiero mancante o non valido nell'URL.");
-        return;
-      }
-      response = await updateTrail(editId, payload);
-      trailIdForUpload = editId;
-    } else {
       response = await createTrail(payload);
       // prova a ricavare l'id creato da più possibili shape di response
       trailIdForUpload =

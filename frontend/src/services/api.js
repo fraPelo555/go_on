@@ -1,7 +1,7 @@
 import axios from "../api/axios";
 
 const api = axios.create({
-  baseURL: "http://localhost:3000"
+  baseURL: "https://go-on-backend.onrender.com/"
 });
 
 api.interceptors.request.use((config) => {
