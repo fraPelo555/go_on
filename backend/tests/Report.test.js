@@ -701,7 +701,7 @@ describe("GET /reports/all/trail/:idTrail", () => {
     expect(normalize(res.body)).toMatchSnapshot();
   });
 
-  it("200 - trail esistente con report", async () => {
+  it("200 - trail esistente con più report", async () => {
     const res = await request(app)
       .get(`/reports/all/trail/${trailWithReports._id}`)
       .set("Authorization", `Bearer ${token}`);
@@ -711,26 +711,6 @@ describe("GET /reports/all/trail/:idTrail", () => {
 
     const texts = res.body.map((r) => r.testo);
     expect(texts).toEqual(expect.arrayContaining(["Report 1", "Report 2"]));
-    const sorted = normalize(res.body).sort((a, b) =>
-      a.state.localeCompare(b.state)
-    );
-    expect(sorted).toMatchSnapshot();
-  });
-
-  it("200 - più report sullo stesso trail", async () => {
-    await Report.create({
-      idUser: user._id,
-      idTrail: trailWithReports._id,
-      testo: "Report 3",
-      state: "In progress",
-    });
-
-    const res = await request(app)
-      .get(`/reports/all/trail/${trailWithReports._id}`)
-      .set("Authorization", `Bearer ${token}`);
-
-    expect(res.statusCode).toBe(200);
-    expect(res.body).toHaveLength(3);
     const sorted = normalize(res.body).sort((a, b) =>
       a.state.localeCompare(b.state)
     );

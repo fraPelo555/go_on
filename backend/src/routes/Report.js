@@ -155,6 +155,17 @@ router.delete(
     next();
   },
   selfOrAdmin((req) => req.report.idUser),
+  (req, res, next) => {
+    if (
+      req.user.role !== "admin" &&
+      req.report.state !== "Nuovo"
+    ) {
+      return res.status(403).json({
+        message: "You can delete a report only if it is in state 'Nuovo'"
+      });
+    }
+    next();
+  },
   async (req, res) => {
     await req.report.deleteOne();
     return res.status(204).send();
