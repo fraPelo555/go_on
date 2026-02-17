@@ -3,6 +3,20 @@ import { ref, onMounted, watch } from "vue";
 import L from "leaflet";
 import "leaflet-gpx";
 import "leaflet/dist/leaflet.css";
+// Import esplicito delle immagini
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
+
+// Override icona di default
+delete L.Icon.Default.prototype._getIconUrl;
+
+L.Icon.Default.mergeOptions({
+  iconUrl: markerIcon,
+  iconRetinaUrl: markerIcon2x,
+  shadowUrl: markerShadow,
+});
+
 
 const props = defineProps({
   center: { type: Object, required: true },
