@@ -1,287 +1,395 @@
 <script setup>
-  import { ref, watch, onMounted } from "vue";
-  import { useRoute, useRouter } from "vue-router";
-  import TrailMap from "../components/TrailMap.vue";
-  import { getTrails } from "../services/trailService";
 
-  /* ROUTER */
-  const route = useRoute();
-  const router = useRouter();
+// IMPORTS
+import { ref, watch, onMounted, computed } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import TrailMap from "../components/TrailMap.vue";
+import { getTrails, deleteTrail, getNearbyTrails } from "../services/trailService";
+import { addFavourite, removeFavourite, getFavourites } from "../services/userService";
+import { getGPX } from "../services/trailService";
 
-  /* STATE */
-  const trails = ref([]);
-  const visibleTrails = ref([]);
-  const showAdvanced = ref(false);
-  const selectedTags = ref([]);
+/* =========================
+   ROUTER
+========================= */
+const route = useRoute();
+const router = useRouter();
 
-  /* AUTH STATE */
-  const isLogged = ref(false);
-  const userId = ref(null);
-  const isAdmin = ref(false);
+const goToDetails = (trailId) => {
+  router.push(`/tracks/${trailId}`);
+};
 
-  const checkAuth = () => {
-    const token = localStorage.getItem("token");
-  
-    if (token) {
-      isLogged.value = true;
-      userId.value = localStorage.getItem("userId");
-      isAdmin.value = localStorage.getItem("isAdmin") === "true";
-    } else {
-      isLogged.value = false;
-      userId.value = null;
-      isAdmin.value = false;
-    }
-  };
+/* =========================
+   STATE
+========================= */
+const trails = ref([]);
+const visibleTrails = ref([]);
+const showAdvanced = ref(false);
+const selectedTags = ref([]);
+const searchText = ref("");
+const favouriteIds = ref(new Set());
+const checkingFav = ref(false);
 
-  onMounted(() => {
-    checkAuth();
-  });
 
-  /* TAG DINAMICI */
-  const tagGroups = ref({});
+/* =========================
+   MISSING GPX POPUP
+========================= */
+const gpxPopupMessage = ref("");
+const gpxPopupVisible = ref(false);
 
-  /* FETCH TAGS (DERIVATI) */
-  const fetchTags = (trailList) => {
-    const allTags = new Set();
-  
-    trailList.forEach(trail => {
-      (trail.tags || []).forEach(tag => allTags.add(tag));
-  });
+const showGpxPopup = (msg) => {
+  gpxPopupMessage.value = msg;
+  gpxPopupVisible.value = true;
+  setTimeout(() => {
+    gpxPopupVisible.value = false;
+  }, 1800); // 1,8 secondi
+};
 
+/* =========================
+   AUTH
+========================= */
+const isLogged = ref(false);
+const userId = ref(null);
+const isAdmin = ref(false);
+const username = ref(localStorage.getItem("username") || "");
+
+const checkAuth = async () => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    isLogged.value = true;
+    userId.value = localStorage.getItem("userId");
+    isAdmin.value = localStorage.getItem("isAdmin") === "true";
+  } else {
+    isLogged.value = false;
+    userId.value = null;
+    isAdmin.value = false;
+  }
+};
+
+/* =========================
+   TAG DINAMICI
+========================= */
+const tagGroups = ref({});
+const fetchTags = (trailList) => {
+  const allTags = new Set();
+  trailList.forEach(t => (t.tags || []).forEach(tag => allTags.add(tag)));
   const tags = Array.from(allTags);
 
   tagGroups.value = {
-    Percorso: tags.filter(t =>
-      ["linear_route", "round_trip", "out_and_back", "multi_stage_route", "summit_route", "ridge"].includes(t)
-    ),
-    Natura: tags.filter(t =>
-      ["flora", "fauna", "scenic", "geological_highlights"].includes(t)
-    ),
-    Accessibilità: tags.filter(t =>
-      ["family_friendly", "dog_friendly", "accessibility", "suitable_for_strollers"].includes(t)
-    ),
-    Tecnico: tags.filter(t =>
-      ["scrambling_required", "exposed_sections", "secured_passages"].includes(t)
-    ),
-    Servizi: tags.filter(t =>
-      ["refreshment_stops_available", "cableway_ascent_descent", "healthy_climate"].includes(t)
-    ),
-    Extra: tags.filter(t =>
-      ["cultural_historical_interest", "insider_tip"].includes(t)
-    )
-   };
+    Percorso: tags.filter(t => ["linear_route","round_trip","out_and_back","multi_stage_route","summit_route","ridge"].includes(t)),
+    Natura: tags.filter(t => ["flora","fauna","scenic","geological_highlights"].includes(t)),
+    Accessibilità: tags.filter(t => ["family_friendly","dog_friendly","accessibility","suitable_for_strollers"].includes(t)),
+    Tecnico: tags.filter(t => ["scrambling_required","exposed_sections","secured_passages"].includes(t)),
+    Servizi: tags.filter(t => ["refreshment_stops_available","cableway_ascent_descent","healthy_climate"].includes(t)),
+    Extra: tags.filter(t => ["cultural_historical_interest","insider_tip"].includes(t)),
   };
+};
 
-  /* FETCH TRAILS */
-  const fetchTrails = async () => {
-    try {
-      const response = await getTrails(route.query);
+const toggleTag = (tag) => {
+  selectedTags.value.includes(tag)
+    ? selectedTags.value.splice(selectedTags.value.indexOf(tag),1)
+    : selectedTags.value.push(tag);
+  updateFilter("tags", selectedTags.value.join(","));
+};
 
-      trails.value = response.data.map(trail => ({
-        id: trail._id,
-        title: trail.title,
-        description: trail.description || "Nessuna descrizione",
-        region: trail.region,
-        valley: trail.valley,
-        difficulty: trail.difficulty,
-        lengthKm: trail.lengthKm,
-        lengthLabel: `${trail.lengthKm} km`,
-        duration: trail.duration,
-        durationLabel: `${trail.duration.hours}h ${trail.duration.minutes}m`,
-        ascentM: trail.ascentM,
-        descentM: trail.descentM,
-        highestPointM: trail.highestPointM,
-        lowestPointM: trail.lowestPointM,
-        roadbook: trail.roadbook,
-        directions: trail.directions,
-        parking: trail.parking,
-        tags: trail.tags || [],
-        coordinates: trail.coordinates,
-        location: trail.location?.coordinates
-          ? { lon: trail.location.coordinates[0], lat: trail.location.coordinates[1] }
-          : null
-      }));
-     
-      visibleTrails.value = trails.value;
-
-    /* 👇 TAG DINAMICI */
+/* =========================
+   FETCH TRAILS
+========================= */
+const fetchTrails = async () => {
+  try {
+    const { data } = await getTrails(route.query);
+    trails.value = data.map(trail => ({
+      id: trail.id,
+      title: trail.title,
+      difficulty: trail.difficulty,
+      lengthLabel: `${trail.lengthKm} km`,
+      durationLabel: `${trail.duration?.hours || 0}h ${trail.duration?.minutes || 0}m`,
+      tags: trail.tags || [],
+      location: trail.location?.coordinates
+        ? { lon: trail.location.coordinates[0], lat: trail.location.coordinates[1] }
+        : null
+    }));
+    visibleTrails.value = trails.value;
     fetchTags(trails.value);
+  } catch (err) { console.error(err); }
+};
 
-    } catch (err) {
-      console.error("Errore fetching trails:", err);
-    }
-  };
+watch(() => route.query, fetchTrails, { immediate: true });
 
-  /* WATCH QUERY */
-  watch(
-    () => route.query,
-    fetchTrails,
-    { immediate: true }
+/* =========================
+   SEARCH & FILTER
+========================= */
+const handleSearch = (event) => {
+  searchText.value = event.target.value.toLowerCase();
+  visibleTrails.value = trails.value.filter(t =>
+    t.title.toLowerCase().includes(searchText.value) ||
+    t.tags.some(tag =>
+      tag.toLowerCase().includes(searchText.value)
+    )
   );
+};
 
-  /* TAG HANDLER */
-  const toggleTag = (tag) => {
-    if (selectedTags.value.includes(tag)) {
-      selectedTags.value = selectedTags.value.filter(t => t !== tag);
-    } else {
-      selectedTags.value.push(tag);
-    }
-    updateFilter("tags", selectedTags.value.join(","));
-  };
+const updateFilter = async (key,value) => {
+  const query = { ...route.query };
+  if (!value) delete query[key]; else query[key] = value;
+  router.replace({ query });
+  await applyNearbyFilter();
+};
 
-  /* UPDATE FILTER */
-  const updateFilter = (key, value) => {
-    const query = { ...route.query };
-    if (!value || value.length === 0) delete query[key];
-    else query[key] = value;
-    router.replace({ query });
-  };
+/* =========================
+   FAVOURITES
+========================= */
+const loadFavourites = async () => {
+  if (!userId.value) { favouriteIds.value = new Set(); return; }
+  checkingFav.value = true;
+  try {
+    const res = await getFavourites(userId.value);
+    const normalize = p => Array.isArray(p) ? p : (p.favourites||p.data||[]);
+    const ids = normalize(res.data).map(item => (item?._id || item?.id || item).toString());
+    favouriteIds.value = new Set(ids);
+  } catch { favouriteIds.value = new Set(); }
+  finally { checkingFav.value = false; }
+};
+
+const toggleFavourite = async (trailId) => {
+  if (!isLogged.value) { alert("Devi essere loggato"); return; }
+  try {
+    if (!favouriteIds.value.has(trailId)) { await addFavourite(userId.value, trailId); favouriteIds.value.add(trailId); }
+    else { await removeFavourite(userId.value, trailId); favouriteIds.value.delete(trailId); }
+    favouriteIds.value = new Set(favouriteIds.value);
+  } catch (err) { console.error(err); alert("Errore preferiti"); }
+};
+
+/* =========================
+   TRAIL ACTIONS
+========================= */
+const handleEditTrail = (trailId) => router.push({ path:"/new-track", query:{editId:trailId} });
+const handleDeleteTrail = async (trailId) => {
+  if (!isAdmin.value) return;
+  if (!confirm("Sei sicuro di voler eliminare il sentiero?")) return;
+  try {
+    await deleteTrail(trailId);
+    trails.value = trails.value.filter(t=>t.id!==trailId);
+    visibleTrails.value = visibleTrails.value.filter(t=>t.id!==trailId);
+  } catch(err){ console.error(err); }
+};
+
+/* =========================
+   GEOLOC
+========================= */
+const geolocCenter = ref(null);
+const geolocLoading = ref(false);
+const geolocError = ref("");
+const centerMode = ref("trails");
+const enableGeolocation = () => {
+  if (!navigator.geolocation) { geolocError.value="Browser non supportato"; return; }
+  geolocLoading.value = true; geolocError.value="";
+  navigator.geolocation.getCurrentPosition(
+    pos => { geolocCenter.value={lat:pos.coords.latitude, lon:pos.coords.longitude}; centerMode.value="geoloc"; geolocLoading.value=false; },
+    () => { geolocError.value="Errore geolocalizzazione"; geolocLoading.value=false; },
+    { enableHighAccuracy:true }
+  );
+};
+
+/* =========================
+   MAP CENTER
+========================= */
+const activeGPX = ref(null);
+
+const mapCenter = computed(() => {
+  if(centerMode.value==="geoloc" && geolocCenter.value) return geolocCenter.value;
+  if(visibleTrails.value?.length) return visibleTrails.value[0].location || {lat:45.4394, lon:7.6473};
+  return {lat:45.4394, lon:7.6473};
+});
+
+const mapMarkers = computed(() =>
+  visibleTrails.value
+    .filter(t => t.location)
+    .map(t => ({
+      id: t.id,
+      lat: Number(t.location.lat),
+      lon: Number(t.location.lon),
+      title: t.title
+    }))
+);
+
+const handleMarkerClick = async (trailId) => {
+  try {
+    // porta il trail in cima
+    const selected = visibleTrails.value.find(t => t.id === trailId);
+    if (!selected) return;
+
+    visibleTrails.value = [
+      selected,
+      ...visibleTrails.value.filter(t => t.id !== trailId)
+    ];
+
+    // carica GPX
+    const { data } = await getGPX(trailId);
+    activeGPX.value = data;
+
+  } catch (err) {
+    // mostra pop-up invece di log
+    showGpxPopup("Attenzione: questo sentiero non ha una traccia GPX");
+    activeGPX.value = null; // pulisci mappa se vuoi
+  }
+};
+
+const handleTrailCardClick = (trailId) => {
+  handleMarkerClick(trailId);
+};
+
+
+
+/* =========================
+   PROXIMITY FILTER
+========================= */
+const radiusKm = ref(5);
+const filterLat = ref(mapCenter.value.lat);
+const filterLon = ref(mapCenter.value.lon);
+
+const applyNearbyFilter = async () => {
+  if(!filterLat.value || !filterLon.value || !radiusKm.value) return;
+  try {
+    const { data } = await getNearbyTrails(filterLat.value, filterLon.value, radiusKm.value);
+    visibleTrails.value = data.map(trail => ({
+      id: trail.id,
+      title: trail.title,
+      description: trail.description || "Nessuna descrizione",
+      difficulty: trail.difficulty,
+      lengthLabel: `${trail.lengthKm} km`,
+      durationLabel: `${trail.duration?.hours||0}h ${trail.duration?.minutes||0}m`,
+      tags: trail.tags || [],
+      location: trail.location?.coordinates ? { lon: trail.location.coordinates[0], lat: trail.location.coordinates[1] } : null
+    }));
+    fetchTags(visibleTrails.value);
+  } catch(err){ console.error(err); }
+};
+
+onMounted(async () => {
+  await checkAuth();
+  await fetchTrails();
+  if (isLogged.value) await loadFavourites();
+});
 </script>
 
-
 <template>
-  <div class="homepage">
+<div class="homepage">
 
-    <!-- HEADER -->
-    <header class="header">
-      <div></div>
-      <div class="header-center">
-        <img src="../assets/goon_logo.png" class="logo" />
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-left">
+     <router-link v-if="isAdmin" to="/admin" class="login-btn">AdminInfo</router-link>
+      <router-link v-if="isAdmin" to="/new-track" class="login-btn">NewTrack</router-link>
+      <router-link v-if="isAdmin" to="/statistics" class="login-btn">Statistics</router-link>
+    </div>
+    <div class="header-center"><img src="../assets/goon_logo.png" class="logo"/></div>
+    <div class="header-right">
+      <div v-if="isLogged" class="user-info"><span class="username-box">👤 {{ username }}</span></div>
+      <router-link v-if="!isLogged" to="/login" class="login-btn">Login</router-link>
+      <router-link v-else to="/profile" class="login-btn">Profile</router-link>
+    </div>
+  </header>
+
+  <!-- BODY -->
+  <main class="main-content">
+
+    <!-- MAP -->
+    <section class="map-section">
+      <TrailMap
+        :center="mapCenter"
+        :zoom="13"
+        :markers="mapMarkers"
+        :gpx="activeGPX"
+        @centerChanged="c=>{filterLat=c.lat; filterLon=c.lon}"
+        @markerClicked="handleMarkerClick"
+      />
+      <button class="geo-btn" @click="enableGeolocation" :disabled="geolocLoading" title="Usa la tua posizione">
+        <span v-if="geolocLoading">…</span>
+        <span v-else>📍</span>
+      </button>
+      <div v-if="geolocError" class="geoloc-error">{{ geolocError }}</div>
+    </section>
+
+    <transition name="fade">
+      <div v-if="gpxPopupVisible" class="gpx-popup">
+        {{ gpxPopupMessage }}
       </div>
-      <div class="header-right">
-      
-        <router-link v-if="!isLogged" to="/login" class="login-btn" >
-          Login
-        </router-link>
-       
-        <div v-else class="user-box">
-          <span class="user-id">
-            {{ userId }}
-          </span>
-         
-          <router-link to="/profile" class="login-btn" >
-          Profile
-        </router-link>
+    </transition>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <input type="text" placeholder="Cerca un sentiero..." class="search-input" @input="handleSearch"/>
+      <button class="advanced-btn" @click="showAdvanced=!showAdvanced">Advanced Search</button>
+
+      <section v-if="showAdvanced" class="advanced-search">
+        <div class="filter-row"><label>Raggio (km)</label><input type="number" min="0" v-model="radiusKm" @input="applyNearbyFilter"/></div>
+        <div class="filter-row"><label>Latitudine</label><input type="number" step="0.0001" v-model="filterLat" @input="applyNearbyFilter"/></div>
+        <div class="filter-row"><label>Longitudine</label><input type="number" step="0.0001" v-model="filterLon" @input="applyNearbyFilter"/></div>
+
+        <div class="filter-row"><label>Region</label><input @input="e=>updateFilter('region',e.target.value)"/></div>
+        <div class="filter-row"><label>Valley</label><input @input="e=>updateFilter('valley',e.target.value)"/></div>
+        <div class="filter-row"><label>Difficulty</label>
+          <select @change="e=>updateFilter('difficulty',e.target.value)">
+            <option value="">All</option>
+            <option value="Easy">Easy</option>
+            <option value="Medium">Medium</option>
+            <option value="Difficult">Difficult</option>
+          </select>
         </div>
-       
-      </div>
 
-    </header>
-
-    <!-- BODY -->
-    <main class="main-content">
-
-      <!-- MAP -->
-      <section class="map-section">
-        <TrailMap :markers="visibleTrails" />
-        <button class="geo-btn" @click="enableGeolocation">📍</button>
+        <div v-for="(tags,group) in tagGroups" :key="group" class="tag-group">
+          <span class="tag-group-title">{{ group }}</span>
+          <div class="tag-container">
+            <button v-for="tag in tags" :key="tag" class="tag-btn" :class="{active:selectedTags.includes(tag)}" @click="toggleTag(tag)">
+              {{ tag.replaceAll('_',' ') }}
+            </button>
+          </div>
+        </div>
       </section>
 
-      <!-- SIDEBAR -->
-      <aside class="sidebar">
+      <!-- RESULTS -->
+      <div class="results">
+        <div v-for="trail in visibleTrails" :key="trail.id" class="trail-card" @click="handleTrailCardClick(trail.id)">
 
-        <!-- SEARCH -->
-        <input
-          type="text"
-          placeholder="Cerca un sentiero..."
-          class="search-input"
-          @input="handleSearch"
-        />
-
-        <button class="advanced-btn" @click="showAdvanced = !showAdvanced">
-          Advanced Search
-        </button>
-
-        <!-- ADVANCED SEARCH -->
-        <section v-if="showAdvanced" class="advanced-search">
-
-          <div class="filter-row">
-            <label>Region</label>
-            <input @input="e => updateFilter('region', e.target.value)" />
+          <h4>{{ trail.title }}</h4>
+          <div class="trail-tags">
+            <span v-for="tag in trail.tags" :key="tag" class="tag-pill">
+              {{ tag.replaceAll('_',' ') }}
+            </span>
           </div>
-
-          <div class="filter-row">
-            <label>Valley</label>
-            <input @input="e => updateFilter('valley', e.target.value)" />
+          <div class="trail-meta">
+            <span>{{ trail.lengthLabel }}</span>
+            <span>{{ trail.durationLabel }}</span>
+            <span>{{ trail.difficulty }}</span>
           </div>
-
-          <div class="filter-row">
-            <label>Difficulty</label>
-            <select @change="e => updateFilter('difficulty', e.target.value)">
-              <option value="">All</option>
-              <option value="Easy">Easy</option>
-              <option value="Medium">Medium</option>
-              <option value="Difficult">Difficult</option>
-            </select>
+         
+          <div class="trail-actions">
+            <button v-if="isLogged" class="fav-btn" :class="{active:favouriteIds.has(trail.id)}" @click.stop="toggleFavourite(trail.id)">
+              <span v-if="favouriteIds.has(trail.id)">★</span><span v-else>☆</span>
+            </button>
+            <button v-if="isAdmin" @click.stop="handleEditTrail(trail.id)">✏️</button>
+            <button v-if="isAdmin" @click.stop="handleDeleteTrail(trail.id)">🗑️</button>
+           
+            <!-- NUOVO BOTTONE DETTAGLI -->
+            <button class="details-btn" @click.stop="goToDetails(trail.id)">Dettagli</button>
           </div>
-
-          <div class="filter-row">
-            <label>Length (km)</label>
-            <div class="range">
-              <input type="number" placeholder="Min" @input="e => updateFilter('minLength', e.target.value)" />
-              <input type="number" placeholder="Max" @input="e => updateFilter('maxLength', e.target.value)" />
-            </div>
-          </div>
-
-          <div class="filter-row">
-            <label>Duration (minutes)</label>
-            <div class="range">
-              <input type="number" placeholder="Min" @input="e => updateFilter('minDuration', e.target.value)" />
-              <input type="number" placeholder="Max" @input="e => updateFilter('maxDuration', e.target.value)" />
-            </div>
-          </div>
-
-          <div class="filter-row">
-            <label>Tags</label>
-
-            <div
-              v-for="(tags, group) in tagGroups"
-              :key="group"
-              class="tag-group"
-            >
-              <h5>{{ group }}</h5>
-              <div class="tag-scroll">
-                <button
-                  v-for="tag in tags"
-                  :key="tag"
-                  :class="{ active: selectedTags.includes(tag) }"
-                  @click="toggleTag(tag)"
-                >
-                  {{ tag.replaceAll("_", " ") }}
-                </button>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <!-- RESULTS -->
-        <div class="results">
-          <router-link
-            v-for="trail in visibleTrails"
-            :key="trail.id"
-            :to="`/tracks/${trail.id}`"
-            class="trail-card"
-          >
-            <h4>{{ trail.title }}</h4>
-            <p>{{ trail.description }}</p>
-            <div class="trail-meta">
-              <span>{{ trail.lengthLabel }}</span>
-              <span>{{ trail.durationLabel }}</span>
-              <span>{{ trail.difficulty }}</span>
-            </div>
-          </router-link>
         </div>
+      </div>
 
-      </aside>
-    </main>
-  </div>
+    </aside>
+
+  </main>
+</div>
 </template>
 
+
 <style scoped>
+/* ================= GLOBAL ================= */
 .homepage {
   height: 100vh;
   display: flex;
   flex-direction: column;
+  font-family: sans-serif;
 }
 
 /* ================= HEADER ================= */
@@ -292,14 +400,23 @@
   align-items: center;
   padding: 0 24px;
   border-bottom: 1px solid #ddd;
+  gap: 12px;
 }
 
 .logo {
   height: 50px;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.header-left,
+.header-right {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .header-right {
-  display: flex;
   justify-content: flex-end;
 }
 
@@ -309,18 +426,35 @@
   background-color: #2c7be5;
   color: white;
   text-decoration: none;
+  font-size: 0.9rem;
 }
 
 /* ================= BODY ================= */
 .main-content {
   flex: 1;
   display: flex;
+  overflow: hidden;
+  min-height: calc(100vh - var(--header-h)); /* => vincolo di altezza per i figli */
+  flex-wrap: wrap;
+}
+
+/* FAV BUTTON */
+.fav-btn {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.fav-btn.active {
+  color: gold;
 }
 
 /* ================= MAP ================= */
 .map-section {
   flex: 2;
   position: relative;
+  min-height: 300px;
 }
 
 .map-container {
@@ -328,12 +462,34 @@
   height: 100%;
 }
 
+.gpx-popup {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #f8d7da;
+  color: #842029;
+  padding: 8px 14px;
+  border-radius: 4px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+  z-index: 9999;
+  font-size: 14px;
+}
+
+.fade-enter-active, .fade-leave-active {
+  transition: opacity 0.3s;
+}
+
+.fade-enter-from, .fade-leave-to {
+  opacity: 0;
+}
+
 /* GEO BUTTON */
 .geo-btn {
   position: absolute;
   bottom: 20px;
   left: 20px;
-  z-index: 1000;          /* 👈 FONDAMENTALE */
+  z-index: 1000;
   width: 48px;
   height: 48px;
   border-radius: 50%;
@@ -344,15 +500,60 @@
   box-shadow: 0 2px 6px rgba(0,0,0,0.3);
 }
 
+/* ================= TAGS ================= */
+.tag-group {
+  margin-bottom: 10px;
+}
+
+.tag-group-title {
+  font-size: 13px;
+  font-weight: 600;
+  display: block;
+  margin-bottom: 4px;
+}
+
+.tag-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tag-btn {
+  padding: 4px 8px;
+  font-size: 12px;
+  border-radius: 14px;
+  border: 1px solid #ccc;
+  background: #f5f5f5;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.tag-btn:hover {
+  background: #e2e2e2;
+}
+
+.tag-btn.active {
+  background: #2c7be5;
+  color: white;
+  border-color: #2c7be5;
+}
+
 /* ================= SIDEBAR ================= */
 .sidebar {
   width: 360px;
+  min-width: 240px;
   padding: 16px;
   border-left: 1px solid #ddd;
   display: flex;
   flex-direction: column;
+  min-height: 0;                 /* già presente: utile */
+  height: 100%;                  /* importante: prende l'altezza dal main-content */
+  max-height: calc(100vh - var(--header-h)); /* difesa extra */
+  overflow: hidden;              /* lascia lo scrolling interno a .results */
 }
 
+
+/* SEARCH & ADVANCED */
 .search-input {
   padding: 8px;
   margin-bottom: 8px;
@@ -364,9 +565,14 @@
 
 /* ================= RESULTS ================= */
 .results {
-  flex: 1;
+  flex: 1 1 auto;     /* occupa lo spazio rimanente nella sidebar */
+  min-height: 0;      /* CRUCIALE per permettere lo scrolling interno in un flex item */
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch; /* scorrimento fluido su iOS */
 }
+
+/* variabile per altezza header (comoda se cambierai l'header) */
+:root { --header-h: 80px; }
 
 .no-trails {
   font-style: italic;
@@ -376,17 +582,44 @@
 }
 
 .trail-card {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  justify-content: center; /* vertical center */
   padding: 12px;
-  margin-bottom: 10px;
   background-color: #f5f5f5;
   border-radius: 8px;
   text-decoration: none;
   color: inherit;
+  transition: background 0.2s ease;
 }
 
 .trail-card:hover {
   background-color: #e9e9e9;
+}
+
+.trail-card a {
+  text-decoration: none;
+  color: inherit;
+}
+
+.trail-card a:hover {
+  text-decoration: none;
+}
+
+.trail-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 6px 0;
+}
+
+.tag-pill {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  background-color: #e3f2fd;
+  color: #2c7be5;
+  border: 1px solid #2c7be5;
 }
 
 .trail-name {
@@ -411,5 +644,75 @@
   gap: 12px;
 }
 
+.header-left {
+  display: flex;
+  gap: 12px;
+}
 
+.trail-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+/* ===================== MEDIA QUERIES ===================== */
+@media (max-width: 1200px) {
+  .main-content {
+    flex-direction: column;
+  }
+  
+  .sidebar {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid #ddd;
+  }
+  
+  .map-section {
+    flex: 1;
+    min-height: 300px;
+  }
+}
+
+/* (opzionale) se vuoi una fallback più esplicita */
+@media (max-width: 1200px) {
+  .sidebar {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid #ddd;
+    max-height: none;
+    height: auto;
+  }
+  .results {
+    /* su mobile il layout diventa verticale, mantenere comunque min-height:0 */
+    min-height: 0;
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 768px) {
+  .header {
+    grid-template-columns: 1fr auto 1fr;
+    padding: 0 12px;
+  }
+
+  .header-left,
+  .header-right {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .login-btn {
+    padding: 6px 12px;
+    font-size: 0.85rem;
+  }
+
+  .sidebar {
+    padding: 12px;
+  }
+  
+  .trail-card {
+    padding: 10px;
+  }
+}
 </style>

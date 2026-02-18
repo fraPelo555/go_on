@@ -1,42 +1,165 @@
 <script setup>
-import { onMounted, ref } from "vue";
+import { ref, onMounted, watch } from "vue";
 import L from "leaflet";
-import "leaflet/dist/leaflet.css";
 import "leaflet-gpx";
+import "leaflet/dist/leaflet.css";
+// Import esplicito delle immagini
+import markerIcon from "leaflet/dist/images/marker-icon.png";
+import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
+
+// Override icona di default
+delete L.Icon.Default.prototype._getIconUrl;
+
+L.Icon.Default.mergeOptions({
+  iconUrl: markerIcon,
+  iconRetinaUrl: markerIcon2x,
+  shadowUrl: markerShadow,
+});
+
 
 const props = defineProps({
-  gpx: {
-    type: String,
-    required: true
-  }
+  center: { type: Object, required: true },
+  zoom: { type: Number, default: 13 },
+  markers: { type: Array, default: () => [] },
+  gpx: { type: String, default: null }
 });
 
-const mapContainer = ref(null);
-let map = null;
+let gpxLayer = null;
+const emit = defineEmits(["centerChanged", "markerClicked"]);
+
+const mapRef = ref(null);       // riferimento al div
+let mapInstance = null;         // istanza Leaflet
+let markersLayer = null;
+
+
+const renderMarkers = () => {
+  if (!mapInstance || !markersLayer) return;
+  
+  markersLayer.clearLayers();
+ 
+  const customIcon = L.divIcon({
+    className: "custom-marker",
+    html: `
+      <svg width="40" height="50" viewBox="0 0 24 24" fill="#e53935" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/>
+        <circle cx="12" cy="9" r="3" fill="white"/>
+      </svg>
+    `,
+    iconSize: [40, 50],
+    iconAnchor: [20, 50]
+  });
+
+
+  props.markers.forEach(m => {
+    const marker = L.marker([m.lat, m.lon], { icon: customIcon })
+     .bindTooltip(m.title, {
+       permanent: false,
+       direction: "top",
+       offset: [0, -40]
+     })
+     .bindPopup(`<strong>${m.title}</strong>`);
+
+
+    marker.on("click", () => {
+      emit("markerClicked", m.id);
+    });
+   
+    marker.addTo(markersLayer);
+  });
+
+};
 
 onMounted(() => {
-  map = L.map(mapContainer.value).setView([45.4394, 7.6473], 13);
+  // inizializza mappa
+  mapInstance = L.map(mapRef.value).setView([props.center.lat, props.center.lon], props.zoom);
+  markersLayer = L.layerGroup().addTo(mapInstance);
 
+  // tile layer OpenStreetMap
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-    attribution: "&copy; OpenStreetMap contributors"
-  }).addTo(map);
+    attribution: "&copy; OpenStreetMap contributors",
+    maxZoom: 19
+  }).addTo(mapInstance);
 
-  new L.GPX(props.gpx, { async: true })
-    .on("loaded", function (e) {
-      map.fitBounds(e.target.getBounds());
-    })
-    .addTo(map);
+  // ascolta movimenti della mappa
+  mapInstance.on("moveend", () => {
+    const c = mapInstance.getCenter();
+    emit("centerChanged", { lat: c.lat, lon: c.lng });
+  });
+  renderMarkers();
 });
+
+// Aggiorna la vista quando cambia props.center
+watch(
+  () => props.center,
+  (newCenter) => {
+    if (!mapInstance || !newCenter) return;
+    mapInstance.setView([Number(newCenter.lat), Number(newCenter.lon)], props.zoom, { animate: true });
+  },
+  { deep: true }
+);
+
+watch(
+  () => props.markers,
+  () => {
+    renderMarkers();
+  },
+  { deep: true }
+);
+
+watch(
+  () => props.gpx,
+  (newGpx) => {
+    if (!mapInstance) return;
+
+    if (gpxLayer) {
+      mapInstance.removeLayer(gpxLayer);
+      gpxLayer = null;
+    }
+
+    if (newGpx) {
+      gpxLayer = new L.GPX(newGpx, {
+        async: true,
+        marker_options: {
+          startIconUrl: '',
+          endIconUrl: '',
+          shadowUrl: '',
+          wptIconUrls: {}
+        },
+        polyline_options: {
+          color: "#e53935",
+          weight: 4,
+          opacity: 0.9
+        }
+      })
+      .on("loaded", function(e) {
+        mapInstance.fitBounds(e.target.getBounds());
+      })
+      .addTo(mapInstance);
+
+    }
+  }
+);
+
+
 </script>
 
 <template>
-  <div ref="mapContainer" class="map"></div>
+  <div ref="mapRef" class="map-container"></div>
 </template>
 
 <style scoped>
-.map {
+.map-container {
   width: 100%;
   height: 100%;
-  z-index:0;
 }
+
+:deep(.custom-marker) {
+  font-size: 38px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
 </style>
+
