@@ -1,0 +1,1336 @@
+openapi: 3.0.4
+info:
+  version: "1.0"
+  title: "GO-ON OpenAPI 3.0"
+  description: API for viewing trails.
+  license:
+    name: MIT
+servers:
+  - url: http://localhost:3000/api
+    description: Localhost
+  - url: https://go-on-backend.onrender.com/
+    description: render.com
+
+
+paths:
+  /trails:
+    get:
+      summary: Ottieni la lista dei trails con filtri opzionali
+      parameters:
+        - in: query
+          name: region
+          schema:
+            type: string
+        - in: query
+          name: valley
+          schema:
+            type: string
+        - in: query
+          name: difficulty
+          schema:
+            type: string
+            enum: [Easy, Medium, Difficult]
+        - in: query
+          name: minLength
+          schema:
+            type: number
+        - in: query
+          name: maxLength
+          schema:
+            type: number
+        - in: query
+          name: minDuration
+          schema:
+            type: number
+            description: Durata minima in minuti
+        - in: query
+          name: maxDuration
+          schema:
+            type: number
+            description: Durata massima in minuti
+        - in: query
+          name: tags
+          schema:
+            type: string
+            description: Lista di tag separati da virgola
+      responses:
+        "200":
+          description: Lista dei trails filtrati
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Trail"
+        "500":
+          description: Errore del server
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
+
+    post:
+      summary: Crea un nuovo trail (admin)
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Trail"
+      responses:
+        "201":
+          description: Trail creato con successo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trail"
+        "400":
+          description: Errore di validazione
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        "401":
+          description: Non autorizzato
+        "403":
+          description: Ruolo insufficiente
+        "500":
+          description: Errore del server
+
+
+  /trails/{id}:
+    get:
+      summary: Ottieni un trail per ID
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Trail trovato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trail"
+        "400":
+          description: ID non valido
+        "404":
+          description: Trail non trovato
+        "500":
+          description: Errore server
+
+
+    put:
+      summary: Modifica un trail esistente (admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/Trail"
+      responses:
+        "200":
+          description: Trail aggiornato con successo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Trail"
+        "400":
+          description: Errore di validazione o campi non modificabili
+        "401":
+          description: Non autorizzato
+        "403":
+          description: Ruolo insufficiente
+        "404":
+          description: Trail non trovato
+        "500":
+          description: Errore server
+
+
+    delete:
+      summary: Elimina un trail (admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Trail eliminato con successo
+        "401":
+          description: Non autorizzato
+        "403":
+          description: Ruolo insufficiente
+        "404":
+          description: Trail non trovato
+        "500":
+          description: Errore server
+
+
+  /trails/near:
+    get:
+      summary: Trova i trail vicini a una posizione
+      parameters:
+        - in: query
+          name: lat
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: lon
+          required: true
+          schema:
+            type: number
+        - in: query
+          name: radius
+          required: true
+          schema:
+            type: number
+            description: Raggio in km
+      responses:
+        "200":
+          description: Lista dei trail nelle vicinanze
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Trail"
+        "400":
+          description: Parametri mancanti
+        "500":
+          description: Errore server
+
+
+  /trails/{id}/gpx:
+    put:
+      summary: Carica file GPX per un trail (admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                gpx:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: GPX caricato con successo
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  filePath:
+                    type: string
+        "400":
+          description: Errore di validazione / file mancante
+        "401":
+          description: Non autorizzato
+        "403":
+          description: Ruolo insufficiente
+        "404":
+          description: Trail non trovato
+        "500":
+          description: Errore server
+
+
+    get:
+      summary: Scarica il file GPX di un trail
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: File GPX trovato
+          content:
+            application/gpx+xml:
+              schema:
+                type: string
+                format: binary
+        "400":
+          description: ID non valido
+        "404":
+          description: Trail o file GPX non trovato
+        "500":
+          description: Errore server
+
+
+  /trails/{id}/download/gpx:
+    get:
+      summary: Scarica il file GPX di un trail
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: File GPX scaricato con successo
+          content:
+            application/gpx+xml:
+              schema:
+                type: string
+                format: binary
+        "404":
+          description: Trail o GPX non trovato
+        "500":
+          description: Errore server
+
+
+  /users:
+    post:
+      summary: Registrazione o login utente (email/password o Google)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AuthRequest"
+      responses:
+        "200":
+          description: Utente autenticato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "201":
+          description: Utente creato e autenticato
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthResponse"
+        "400":
+          description: Parametri mancanti o errore di validazione
+        "401":
+          description: Autenticazione fallita (password errata o token Google non valido)
+        "500":
+          description: Errore interno del server
+
+
+  /users/all:
+    get:
+      summary: Ottieni la lista di tutti gli utenti (solo admin)
+      security:
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Lista utenti
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  count:
+                    type: integer
+                  users:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/User"
+        "401":
+          description: Token mancante o non valido
+        "403":
+          description: Ruolo insufficiente
+        "500":
+          description: Errore interno del server
+
+
+  /users/{id}:
+    get:
+      summary: Ottieni i dati di un utente (self o admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Utente trovato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  user:
+                    $ref: "#/components/schemas/User"
+        "400":
+          description: ID utente non valido
+        "401":
+          description: Token mancante o non valido
+        "403":
+          description: Accesso negato
+        "404":
+          description: Utente non trovato
+        "500":
+          description: Errore interno del server
+
+
+    put:
+      summary: Aggiorna un utente (self o admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                password:
+                  type: string
+      responses:
+        "200":
+          description: Utente aggiornato
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  user:
+                    $ref: "#/components/schemas/User"
+        "400":
+          description: Tentativo di modificare email o ruolo / errore validazione
+        "401":
+          description: Token mancante o non valido
+        "403":
+          description: Accesso negato
+        "404":
+          description: Utente non trovato
+        "500":
+          description: Errore interno del server
+
+
+    delete:
+      summary: Elimina un utente (self o admin)
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Utente eliminato
+        "400":
+          description: ID non valido
+        "401":
+          description: Token mancante o non valido
+        "403":
+          description: Accesso negato
+        "404":
+          description: Utente non trovato
+        "500":
+          description: Errore interno del server
+
+
+  /users/{idUser}/favourites/{idTrail}:
+    post:
+      summary: Aggiunge un trail ai preferiti dell'utente
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: idUser
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: idTrail
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Trail aggiunto ai preferiti
+        "400":
+          description: ID utente o trail non valido
+        "401":
+          description: Token mancante o non valido
+        "403":
+          description: Accesso negato
+        "404":
+          description: Utente o trail non trovato
+        "409":
+          description: Trail già presente nei preferiti
+        "500":
+          description: Errore interno del server
+
+
+    delete:
+      summary: Rimuove un trail dai preferiti dell'utente
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: idUser
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: idTrail
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Trail rimosso dai preferiti
+        "400":
+          description: ID non valido
+        "401":
+          description: Token mancante o non valido
+        "403":
+          description: Accesso negato
+        "404":
+          description: Utente o preferito non trovato
+        "500":
+          description: Errore interno del server
+
+
+  /users/favourites/{idUser}:
+    get:
+      summary: Ottieni i trail preferiti di un utente
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: idUser
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Lista dei preferiti
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  count:
+                    type: integer
+                  favourites:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Trail"
+        "400":
+          description: ID utente non valido
+        "401":
+          description: Token mancante o non valido
+        "403":
+          description: Accesso negato
+        "404":
+          description: Utente non trovato
+        "500":
+          description: Errore interno del server
+
+
+  /reports/{idTrail}:
+    post:
+      summary: Create a new report for a trail
+      tags: [Reports]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: idTrail
+          required: true
+          schema:
+            type: string
+          description: MongoDB ObjectId of the trail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - idUser
+                - idTrail
+                - testo
+              properties:
+                idUser:
+                  type: string
+                  description: MongoDB ObjectId of the user creating the report
+                idTrail:
+                  type: string
+                  description: MongoDB ObjectId of the trail
+                testo:
+                  type: string
+                  description: Report description text
+                state:
+                  type: string
+                  enum: [New, In progress, Resolved]
+            example:
+              idUser: "65f123abc123abc123abc123"
+              idTrail: "65f456def456def456def456"
+              testo: "Broken bridge at km 3"
+      responses:
+        201:
+          description: Report successfully created
+        400:
+          description: Missing required fields, validation error, or invalid data
+        401:
+          description: Unauthorized (missing or invalid JWT)
+        404:
+          description: Trail not found
+        500:
+          description: Internal server error
+
+
+  /reports/all:
+    get:
+      summary: Get all reports (admin only)
+      tags: [Reports]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: state
+          required: false
+          schema:
+            type: string
+          description: |
+            Filter by state. Multiple values allowed separated by comma.
+            Example: ?state=New,Resolved
+      responses:
+        200:
+          description: List of reports
+        401:
+          description: Unauthorized
+        403:
+          description: Forbidden (admin role required)
+        500:
+          description: Internal server error
+
+
+  /reports/{id}:
+    get:
+      summary: Get a report by id
+      tags: [Reports]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: MongoDB ObjectId of the report
+      responses:
+        200:
+          description: Report retrieved successfully (with populated user and trail)
+        400:
+          description: Invalid report id
+        401:
+          description: Unauthorized
+        404:
+          description: Report not found
+        500:
+          description: Internal server error
+
+
+    put:
+      summary: Update a report (owner or admin)
+      tags: [Reports]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: MongoDB ObjectId of the report
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                testo:
+                  type: string
+                state:
+                  type: string
+                  enum: [New, In progress, Resolved]
+            example:
+              testo: "Updated description"
+              state: "Resolved"
+      responses:
+        200:
+          description: Report updated successfully
+        400:
+          description: Invalid id, no valid fields to update, or validation error
+        401:
+          description: Unauthorized
+        403:
+          description: Forbidden (not owner nor admin)
+        404:
+          description: Report not found
+        500:
+          description: Internal server error
+
+
+    delete:
+      summary: Delete a report (owner or admin)
+      tags: [Reports]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: MongoDB ObjectId of the report
+      responses:
+        204:
+          description: Report successfully deleted
+        400:
+          description: Invalid report id
+        401:
+          description: Unauthorized
+        403:
+          description: Forbidden (not owner nor admin)
+        404:
+          description: Report not found
+        500:
+          description: Internal server error
+
+
+  /reports/all/trail/{idTrail}:
+    get:
+      summary: Get all reports for a specific trail
+      tags: [Reports]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: idTrail
+          required: true
+          schema:
+            type: string
+          description: MongoDB ObjectId of the trail
+      responses:
+        200:
+          description: List of reports for the specified trail (with populated user and trail)
+        400:
+          description: Invalid trail id
+        401:
+          description: Unauthorized
+        404:
+          description: Trail not found
+        500:
+          description: Internal server error
+
+
+  /reports/all/user/{idUser}:
+    get:
+      summary: Get all reports of a specific user (self or admin)
+      tags: [Reports]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: idUser
+          required: true
+          schema:
+            type: string
+          description: MongoDB ObjectId of the user
+      responses:
+        200:
+          description: List of reports created by the specified user
+        400:
+          description: Invalid user id
+        401:
+          description: Unauthorized
+        403:
+          description: Forbidden (not self nor admin)
+        404:
+          description: User not found
+        500:
+          description: Internal server error
+
+
+  /feedbacks/{idTrail}:
+    post:
+      summary: Create feedback for a trail
+      tags: [Feedbacks]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: idTrail
+          required: true
+          schema:
+            type: string
+          description: MongoDB ObjectId of the trail
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - idUser
+                - idTrail
+                - valutazione
+              properties:
+                idUser:
+                  type: string
+                  description: MongoDB ObjectId of the user
+                idTrail:
+                  type: string
+                  description: MongoDB ObjectId of the trail
+                testo:
+                  type: string
+                valutazione:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+            example:
+              idUser: "65f123abc123abc123abc123"
+              idTrail: "65f456def456def456def456"
+              testo: "Beautiful trail with great views"
+              valutazione: 5
+      responses:
+        201:
+          description: Feedback created successfully
+        400:
+          description: Validation error or malformed request
+        401:
+          description: Unauthorized (missing or invalid JWT)
+        409:
+          description: Feedback already exists for this trail
+        500:
+          description: Internal server error
+
+
+  /feedbacks/all:
+    get:
+      summary: Get all feedbacks (admin only)
+      tags: [Feedbacks]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: query
+          name: valutazione
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 5
+          description: Filter feedbacks by rating value
+      responses:
+        200:
+          description: List of feedbacks
+        400:
+          description: Invalid valutazione filter
+        401:
+          description: Unauthorized
+        403:
+          description: Forbidden (admin role required)
+        500:
+          description: Internal server error
+
+
+  /feedbacks/{id}:
+    get:
+      summary: Get feedback by id
+      tags: [Feedbacks]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: MongoDB ObjectId of the feedback
+      responses:
+        200:
+          description: Feedback retrieved successfully (user and trail populated)
+        400:
+          description: Invalid feedback id
+        401:
+          description: Unauthorized
+        404:
+          description: Feedback not found
+        500:
+          description: Internal server error
+
+
+    put:
+      summary: Update feedback (owner or admin)
+      tags: [Feedbacks]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                testo:
+                  type: string
+                valutazione:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+            example:
+              testo: "Updated feedback text"
+              valutazione: 4
+      responses:
+        200:
+          description: Feedback updated successfully
+        400:
+          description: Invalid data or validation error
+        401:
+          description: Unauthorized
+        403:
+          description: Forbidden (not owner nor admin)
+        404:
+          description: Feedback not found
+        500:
+          description: Internal server error
+
+
+    delete:
+      summary: Delete feedback (owner or admin)
+      tags: [Feedbacks]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        204:
+          description: Feedback deleted successfully
+        400:
+          description: Invalid feedback id
+        401:
+          description: Unauthorized
+        403:
+          description: Forbidden (not owner nor admin)
+        404:
+          description: Feedback not found
+        500:
+          description: Internal server error
+
+
+  /feedbacks/all/trail/{idTrail}:
+    get:
+      summary: Get all feedbacks for a specific trail
+      tags: [Feedbacks]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: idTrail
+          required: true
+          schema:
+            type: string
+          description: MongoDB ObjectId of the trail
+      responses:
+        200:
+          description: List of feedbacks for the specified trail
+        400:
+          description: Invalid trail id
+        401:
+          description: Unauthorized
+        404:
+          description: Trail not found
+        500:
+          description: Internal server error
+
+
+  /feedbacks/all/user/{idUser}:
+    get:
+      summary: Get all feedbacks of a specific user (self or admin)
+      tags: [Feedbacks]
+      security:
+        - bearerAuth: []
+      parameters:
+        - in: path
+          name: idUser
+          required: true
+          schema:
+            type: string
+          description: MongoDB ObjectId of the user
+      responses:
+        200:
+          description: List of feedbacks created by the user
+        400:
+          description: Invalid user id
+        401:
+          description: Unauthorized
+        403:
+          description: Forbidden (not self nor admin)
+        404:
+          description: User not found
+        500:
+          description: Internal server error
+
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+
+  schemas:
+    CoordinatesDD:
+      type: object
+      required:
+        - lat
+        - lon
+      properties:
+        lat:
+          type: number
+          minimum: -90
+          maximum: 90
+        lon:
+          type: number
+          minimum: -180
+          maximum: 180
+
+
+    CoordinatesDMS:
+      type: object
+      properties:
+        lat:
+          type: string
+        lon:
+          type: string
+
+
+    CoordinatesUTM:
+      type: object
+      properties:
+        zone:
+          type: string
+        easting:
+          type: number
+          minimum: 0
+        northing:
+          type: number
+          minimum: 0
+
+
+    Coordinates:
+      type: object
+      required:
+        - DD
+      properties:
+        DD:
+          $ref: "#/components/schemas/CoordinatesDD"
+        DMS:
+          $ref: "#/components/schemas/CoordinatesDMS"
+        UTM:
+          $ref: "#/components/schemas/CoordinatesUTM"
+
+
+    Duration:
+      type: object
+      properties:
+        hours:
+          type: integer
+          minimum: 0
+          default: 0
+        minutes:
+          type: integer
+          minimum: 0
+          maximum: 59
+          default: 0
+
+
+    Trail:
+      type: object
+      required:
+        - title
+        - coordinates
+        - idAdmin
+      properties:
+        id:
+          type: string
+          description: ObjectId generato da MongoDB
+        title:
+          type: string
+        description:
+          type: string
+        region:
+          type: string
+        valley:
+          type: string
+        difficulty:
+          type: string
+          enum: [Easy, Medium, Difficult]
+        lengthKm:
+          type: number
+          minimum: 0
+        duration:
+          $ref: "#/components/schemas/Duration"
+        roadbook:
+          type: string
+        directions:
+          type: string
+        parking:
+          type: string
+        ascentM:
+          type: number
+          minimum: 0
+        descentM:
+          type: number
+          minimum: 0
+        highestPointM:
+          type: number
+          minimum: 0
+        lowestPointM:
+          type: number
+        tags:
+          type: array
+          items:
+            type: string
+            enum:
+              - linear_route
+              - scenic
+              - geological_highlights
+              - fauna
+              - healthy_climate
+              - round_trip
+              - cultural_historical_interest
+              - flora
+              - out_and_back
+              - refreshment_stops_available
+              - family_friendly
+              - multi_stage_route
+              - summit_route
+              - exposed_sections
+              - insider_tip
+              - ridge
+              - cableway_ascent_descent
+              - suitable_for_strollers
+              - secured_passages
+              - dog_friendly
+              - accessibility
+              - scrambling_required
+        coordinates:
+          $ref: "#/components/schemas/Coordinates"
+        location:
+          type: object
+          properties:
+            type:
+              type: string
+              enum: [Point]
+            coordinates:
+              type: array
+              items:
+                type: number
+              description: [lon, lat]
+        idAdmin:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+
+    User:
+      type: object
+      required:
+        - email
+      properties:
+        id:
+          type: string
+          description: ObjectId MongoDB
+        username:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [admin, base]
+        favourites:
+          type: array
+          items:
+            type: string
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+
+    AuthRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        email:
+          type: string
+        password:
+          type: string
+        googleToken:
+          type: string
+      oneOf:
+        - required: [email, password]
+        - required: [googleToken]
+
+
+    AuthResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        token:
+          type: string
+        id:
+          type: string
+        email:
+          type: string
+        username:
+          type: string
+        role:
+          type: string
+
+
+    Report:
+      type: object
+      required:
+        - idUser
+        - idTrail
+        - testo
+      properties:
+        id:
+          type: string
+          description: Virtual id derived from MongoDB ObjectId
+        idUser:
+          type: string
+          description: MongoDB ObjectId reference to User
+        idTrail:
+          type: string
+          description: MongoDB ObjectId reference to Trail
+        testo:
+          type: string
+          description: Report text content
+        state:
+          type: string
+          enum:
+            - Nuovo
+            - In progresso
+            - Risolto
+          default: Nuovo
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+
+    Feedback:
+      type: object
+      required:
+        - idUser
+        - idTrail
+        - valutazione
+      properties:
+        id:
+          type: string
+          description: Virtual id derived from MongoDB ObjectId
+        idUser:
+          type: string
+          description: MongoDB ObjectId reference to User
+        idTrail:
+          type: string
+          description: MongoDB ObjectId reference to Trail
+        testo:
+          type: string
+        valutazione:
+          type: integer
+          minimum: 1
+          maximum: 5
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
